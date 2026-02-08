@@ -31,14 +31,25 @@ func main() {
 	}
 	defer pool.Close()
 
+	if err := internal.InitSnowflake(); err != nil {
+		log.Fatalf("Failed to initialize Snowflake: %v", err)
+	}
+
 	r := gin.Default()
 
+	r.Use(internal.ErrorHandler())
 	
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
 		})
 	})
+	
+	repo := internal.NewAuthRepository(pool)
+	service := internal.NewAuthService(repo)
+	handler := internal.NewAuthHandler(service)
+
+	r.POST("/sign-up", handler.SignUp)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
