@@ -1,0 +1,21 @@
+http:
+  routers:
+    auth-router:
+      rule: "PathPrefix(`/auth`)"
+      service: auth-service
+      entryPoints:
+        - web
+      middlewares:
+        - auth-strip
+
+  middlewares:
+    auth-strip:
+      stripPrefix:
+        prefixes:
+          - "/auth"
+
+  services:
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth:8080"
