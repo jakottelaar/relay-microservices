@@ -8,35 +8,39 @@ import (
 )
 
 type AuthService interface {
-	SignUp(ctx context.Context, req SignUpRequest) (*Account, error)
+	SignUp(ctx context.Context, req SignUpRequest) (*Account, string, error)
+	RefreshToken(ctx context.Context, token string) (string, error)
+	ValidateToken(ctx context.Context, token string) (*Claims, error)
 }
 
 type authService struct {
 	repo *AuthRepository
+	jwtManager *JWTManager
 }
 
-func NewAuthService(repo *AuthRepository) *authService {
+func NewAuthService(repo *AuthRepository, jwtManager *JWTManager) *authService {
 	return &authService{
 		repo: repo,
+		jwtManager: jwtManager,
 	}
 }
 
-func (s *authService) SignUp(ctx context.Context, req SignUpRequest) (*Account, error) {
+func (s *authService) SignUp(ctx context.Context, req SignUpRequest) (*Account, string, error) {
 	_, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
 	if err == nil {
-		return nil, NewDuplicateError("Email already registered")
+		return nil, "", NewDuplicateError("Email already registered")
 	}
 
 	hashedPassword, err := argon2id.CreateHash(req.Password, argon2id.DefaultParams)
 	if err != nil {
-		return nil, NewInternalServerError("failed to create user")
+		return nil, "", NewInternalServerError("failed to create user")
 	}
 
 	req.Password = hashedPassword
 
 	accountId, err := sf.NextID()
 	if err != nil {
-		return nil, NewInternalServerError("failed to generate account ID")
+		return nil,	"", NewInternalServerError("failed to generate account ID")
 	}
 
 	createdAccount, err := s.repo.Queries.CreateAccount(ctx, queries.CreateAccountParams{
@@ -45,7 +49,12 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest) (*Account, 
 		PasswordHash: req.Password,
 	})
 	if err != nil {
-		return nil, NewInternalServerError("failed to create user: " + err.Error())
+		return nil, "", NewInternalServerError("failed to create user: " + err.Error())
+	}
+
+	token, err := s.jwtManager.GenerateToken(createdAccount.ID, createdAccount.Email)
+	if err != nil {
+		return nil, "", NewInternalServerError("failed to generate token")
 	}
 
 	account := &Account{
@@ -54,5 +63,5 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest) (*Account, 
 		CreatedAt:    createdAccount.CreatedAt.Time,
 	}
 
-	return account, nil
+	return account, token, nil
 }

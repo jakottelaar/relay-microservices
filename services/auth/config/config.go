@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -11,6 +12,8 @@ type Config struct {
 	Env 	   string
 	Port        string
 	DB DBConfig
+	JWTSecret   string
+	JWTExpiry   time.Duration
 }
 
 type DBConfig struct {
@@ -42,6 +45,9 @@ func LoadConfig() (*Config, error) {
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
 
+	jwtSecret := getEnv("JWT_SECRET", "defaultsecret")
+	jwtExpiry := time.Duration(getEnvInt("JWT_EXPIRY", 3600)) * time.Second
+
 	return &Config{
 		Port: port,
 		DB: DBConfig{
@@ -51,6 +57,8 @@ func LoadConfig() (*Config, error) {
 			MaxConnLifetime: maxConnLifetime,
 			MaxConnIdleTime: maxConnIdleTime,
 		},
+		JWTSecret: jwtSecret,
+		JWTExpiry: jwtExpiry,
 	}, nil
 
 }

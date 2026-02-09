@@ -45,8 +45,9 @@ func main() {
 		})
 	})
 	
+	jwtManger := internal.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry)
 	repo := internal.NewAuthRepository(pool)
-	service := internal.NewAuthService(repo)
+	service := internal.NewAuthService(repo, jwtManger)
 	handler := internal.NewAuthHandler(service)
 
 	r.POST("/sign-up", handler.SignUp)

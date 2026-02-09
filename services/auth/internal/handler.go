@@ -24,14 +24,14 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
 		return
 	}
 
-	account, err := h.service.SignUp(c.Request.Context(), *req)
+	account, token, err := h.service.SignUp(c.Request.Context(), *req)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	c.JSON(http.StatusCreated, &SignUpResponse{
-		AccessToken: "",
+		AccessToken: token,
 		RefreshToken: "",
 		Account: account,
 	})
