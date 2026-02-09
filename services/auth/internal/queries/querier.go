@@ -9,12 +9,18 @@ import (
 )
 
 type Querier interface {
-	CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error)
+	CountActiveSessions(ctx context.Context, userAccountID int64) (int64, error)
+	CreateAccount(ctx context.Context, arg CreateAccountParams) (UserAccount, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
 	DeleteAccount(ctx context.Context, id int64) error
-	GetAccountByEmail(ctx context.Context, email string) (Account, error)
-	GetAccountByID(ctx context.Context, id int64) (Account, error)
+	GetAccountByEmail(ctx context.Context, email string) (UserAccount, error)
+	GetAccountByID(ctx context.Context, id int64) (UserAccount, error)
+	GetSessionByTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error)
+	RevokeAllUserSessions(ctx context.Context, userAccountID int64) error
+	RevokeSession(ctx context.Context, id int64) error
 	UpdateLastLogin(ctx context.Context, id int64) error
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
+	UpdateSessionLastUsed(ctx context.Context, id int64) error
 }
 
 var _ Querier = (*Queries)(nil)

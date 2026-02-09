@@ -5,14 +5,28 @@
 package queries
 
 import (
+	"net/netip"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Account struct {
+type UserAccount struct {
 	ID           int64              `json:"id"`
 	Email        string             `json:"email"`
 	PasswordHash string             `json:"password_hash"`
 	LastLoginAt  pgtype.Timestamptz `json:"last_login_at"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type UserSession struct {
+	ID               int64              `json:"id"`
+	UserAccountID    int64              `json:"user_account_id"`
+	RefreshTokenHash string             `json:"refresh_token_hash"`
+	UserAgent        pgtype.Text        `json:"user_agent"`
+	IpAddress        *netip.Addr        `json:"ip_address"`
+	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt        pgtype.Timestamptz `json:"revoked_at"`
+	LastUsedAt       pgtype.Timestamptz `json:"last_used_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }

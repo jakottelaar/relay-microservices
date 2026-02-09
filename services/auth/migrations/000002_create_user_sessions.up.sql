@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     id BIGINT PRIMARY KEY, --Snowflake ID
     user_account_id BIGINT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
 
-    refresh_token_hash TEXT NOT NULL,
+    refresh_token_hash TEXT NOT NULL UNIQUE,
     user_agent TEXT,
     ip_address INET,
 
