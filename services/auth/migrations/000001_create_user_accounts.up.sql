@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS accounts (
+CREATE TABLE IF NOT EXISTS user_accounts (
     id BIGINT PRIMARY KEY, --Snowflake ID
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_accounts_email ON accounts(email);
+CREATE INDEX idx_user_accounts_email ON user_accounts(email);
 
 -- Auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -18,7 +18,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_accounts_updated_at
-    BEFORE UPDATE ON accounts
+CREATE TRIGGER update_user_accounts_updated_at
+    BEFORE UPDATE ON user_accounts
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
