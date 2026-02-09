@@ -18,21 +18,26 @@ func NewAuthHandler(service AuthService) *AuthHandler {
 
 func (h *AuthHandler) SignUp(c *gin.Context) {
 
-	var req *SignUpRequest
+	var req SignUpRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	account, token, err := h.service.SignUp(c.Request.Context(), *req)
+	metadata := extractSessionMetadata(c)
+
+	authResp, err := h.service.SignUp(c.Request.Context(), req, metadata)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, &SignUpResponse{
-		AccessToken: token,
-		RefreshToken: "",
-		Account: account,
-	})
+	c.JSON(http.StatusCreated, authResp)
+}
+
+func extractSessionMetadata(c *gin.Context) SessionMetadata {
+	return SessionMetadata{
+		UserAgent: c.GetHeader("User-Agent"),
+		IPAddress: c.ClientIP(),
+	}
 }

@@ -45,9 +45,12 @@ func main() {
 		})
 	})
 	
-	jwtManger := internal.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry)
+	jwtManager, err := internal.NewJWTManager(cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize JWT manager: %v", err)
+	}
 	repo := internal.NewAuthRepository(pool)
-	service := internal.NewAuthService(repo, jwtManger)
+	service := internal.NewAuthService(repo, jwtManager, cfg)
 	handler := internal.NewAuthHandler(service)
 
 	r.POST("/sign-up", handler.SignUp)

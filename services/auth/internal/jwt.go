@@ -1,14 +1,22 @@
 package internal
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jakottelaar/relay-microservices/services/auth/config"
 )
 
 var (
@@ -20,41 +28,69 @@ const (
 	AuthorizationHeader = "Authorization"
 	BearerPrefix        = "Bearer "
 	UserIDKey           = "user_id"
-	UserEmailKey        = "user_email"
 )
 
 type Claims struct {
 	UserID int64  `json:"user_id"`
-	Email  string `json:"email"`
 	jwt.RegisteredClaims
 }
 
 type JWTManager struct {
-	secretKey string
-	expiry    time.Duration
+	privateKey *rsa.PrivateKey
+	publicKey  *rsa.PublicKey
+	cfg        *config.Config
 }
 
-func NewJWTManager(secretKey string, expiry time.Duration) *JWTManager {
-	return &JWTManager{
-		secretKey: secretKey,
-		expiry:    expiry,
+func NewJWTManager(cfg *config.Config) (*JWTManager, error) {
+	// Private key only auth service needs this
+	privateKey, err := loadPrivateKey(cfg.PrivateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
+
+	// Public key for validation
+	publicKey, err := loadPublicKey(cfg.PublicKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load public key: %w", err)
+	}
+
+	return &JWTManager{
+		privateKey: privateKey,
+		publicKey:  publicKey,
+		cfg:        cfg,
+	}, nil
 }
 
-func (m *JWTManager) GenerateToken(userID int64, email string) (string, error) {
+// For other services that only need to validate
+func NewJWTValidator(cfg *config.Config) (*JWTManager, error) {
+	publicKey, err := loadPublicKey(cfg.PublicKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load public key: %w", err)
+	}
+
+	return &JWTManager{
+		publicKey: publicKey,
+		cfg:       cfg,
+	}, nil
+}
+
+func (m *JWTManager) GenerateToken(userID int64) (string, error) {
+	if m.privateKey == nil {
+		return "", errors.New("private key not loaded - cannot generate tokens")
+	}
+
 	claims := Claims{
 		UserID: userID,
-		Email: email,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.expiry)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.cfg.AccessTokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "relay-auth",
+			Issuer:    m.cfg.JWTIssuer,
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(m.secretKey))
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	return token.SignedString(m.privateKey)
 }
 
 func (m *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
@@ -62,10 +98,10 @@ func (m *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 		tokenString,
 		&Claims{},
 		func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return []byte(m.secretKey), nil
+			return m.publicKey, nil
 		},
 	)
 
@@ -85,9 +121,56 @@ func (m *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
+func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
+	keyData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block")
+	}
+
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	rsaPrivateKey, ok := privateKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("not an RSA private key")
+	}
+
+	return rsaPrivateKey, nil
+}
+
+func loadPublicKey(path string) (*rsa.PublicKey, error) {
+	keyData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block")
+	}
+
+	pubInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, ok := pubInterface.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("not an RSA public key")
+	}
+
+	return publicKey, nil
+}
+
 func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get token from header
 		authHeader := c.GetHeader(AuthorizationHeader)
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
@@ -95,14 +178,12 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 			return
 		}
 
-		// Check Bearer prefix
 		if !strings.HasPrefix(authHeader, BearerPrefix) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
 			c.Abort()
 			return
 		}
 
-		// Extract token
 		token := strings.TrimPrefix(authHeader, BearerPrefix)
 
 		claims, err := jwtManager.ValidateToken(token)
@@ -113,10 +194,22 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 		}
 
 		c.Set(UserIDKey, claims.UserID)
-		c.Set(UserEmailKey, claims.Email)
 
 		c.Next()
 	}
+}
+
+func GenerateRefreshToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+func HashRefreshToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return base64.URLEncoding.EncodeToString(hash[:])
 }
 
 func GetUserID(c *gin.Context) (int64, bool) {
@@ -126,13 +219,4 @@ func GetUserID(c *gin.Context) (int64, bool) {
 	}
 	id, ok := userID.(int64)
 	return id, ok
-}
-
-func GetUserEmail(c *gin.Context) (string, bool) {
-	email, exists := c.Get(UserEmailKey)
-	if !exists {
-		return "", false
-	}
-	emailStr, ok := email.(string)
-	return emailStr, ok
 }

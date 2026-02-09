@@ -12,8 +12,12 @@ type Config struct {
 	Env 	   string
 	Port        string
 	DB DBConfig
-	JWTSecret   string
-	JWTExpiry   time.Duration
+	PrivateKeyPath     string 
+	PublicKeyPath      string
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
+	MaxSessionsPerUser int
+	JWTIssuer          string
 }
 
 type DBConfig struct {
@@ -45,9 +49,13 @@ func LoadConfig() (*Config, error) {
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
 
-	jwtSecret := getEnv("JWT_SECRET", "defaultsecret")
-	jwtExpiry := time.Duration(getEnvInt("JWT_EXPIRY", 3600)) * time.Second
-
+	privateKeyPath := getEnv("PRIVATE_KEY_PATH", "keys/private.key")
+	publicKeyPath := getEnv("PUBLIC_KEY_PATH", "keys/public.key")
+	accessTokenExpiry := time.Duration(getEnvInt("ACCESS_TOKEN_EXPIRY", 900)) * time.Second
+	refreshTokenExpiry := time.Duration(getEnvInt("REFRESH_TOKEN_EXPIRY", 168)) * time.Hour
+	maxSessionsPerUser := getEnvInt("MAX_SESSIONS_PER_USER", 5)
+	jwtIssuer := getEnv("JWT_ISSUER", "relay-auth")
+	
 	return &Config{
 		Port: port,
 		DB: DBConfig{
@@ -57,8 +65,12 @@ func LoadConfig() (*Config, error) {
 			MaxConnLifetime: maxConnLifetime,
 			MaxConnIdleTime: maxConnIdleTime,
 		},
-		JWTSecret: jwtSecret,
-		JWTExpiry: jwtExpiry,
+		PrivateKeyPath: privateKeyPath,
+		PublicKeyPath: publicKeyPath,
+		AccessTokenExpiry: accessTokenExpiry,
+		RefreshTokenExpiry: refreshTokenExpiry,
+		MaxSessionsPerUser: maxSessionsPerUser,
+		JWTIssuer: jwtIssuer,
 	}, nil
 
 }
