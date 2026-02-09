@@ -35,13 +35,18 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-type JWTManager struct {
+type JWTManager interface {
+	GenerateToken(userID int64) (string, error)
+	ValidateToken(tokenString string) (*Claims, error)
+}
+
+type jwtManager struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
 	cfg        *config.Config
 }
 
-func NewJWTManager(cfg *config.Config) (*JWTManager, error) {
+func NewJWTManager(cfg *config.Config) (*jwtManager, error) {
 	// Private key only auth service needs this
 	privateKey, err := loadPrivateKey(cfg.PrivateKeyPath)
 	if err != nil {
@@ -54,7 +59,7 @@ func NewJWTManager(cfg *config.Config) (*JWTManager, error) {
 		return nil, fmt.Errorf("failed to load public key: %w", err)
 	}
 
-	return &JWTManager{
+	return &jwtManager{
 		privateKey: privateKey,
 		publicKey:  publicKey,
 		cfg:        cfg,
@@ -62,19 +67,19 @@ func NewJWTManager(cfg *config.Config) (*JWTManager, error) {
 }
 
 // For other services that only need to validate
-func NewJWTValidator(cfg *config.Config) (*JWTManager, error) {
+func NewJWTValidator(cfg *config.Config) (*jwtManager, error) {
 	publicKey, err := loadPublicKey(cfg.PublicKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load public key: %w", err)
 	}
 
-	return &JWTManager{
+	return &jwtManager{
 		publicKey: publicKey,
 		cfg:       cfg,
 	}, nil
 }
 
-func (m *JWTManager) GenerateToken(userID int64) (string, error) {
+func (m *jwtManager) GenerateToken(userID int64) (string, error) {
 	if m.privateKey == nil {
 		return "", errors.New("private key not loaded - cannot generate tokens")
 	}
@@ -93,7 +98,7 @@ func (m *JWTManager) GenerateToken(userID int64) (string, error) {
 	return token.SignedString(m.privateKey)
 }
 
-func (m *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
+func (m *jwtManager) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenString,
 		&Claims{},
@@ -169,7 +174,7 @@ func loadPublicKey(path string) (*rsa.PublicKey, error) {
 	return publicKey, nil
 }
 
-func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
+func AuthMiddleware(jwtManager *jwtManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(AuthorizationHeader)
 		if authHeader == "" {

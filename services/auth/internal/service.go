@@ -17,11 +17,11 @@ type AuthService interface {
 
 type authService struct {
 	repo *AuthRepository
-	jwtManager *JWTManager
+	jwtManager JWTManager
 	config     *config.Config
 }
 
-func NewAuthService(repo *AuthRepository, jwtManager *JWTManager, config *config.Config) *authService {
+func NewAuthService(repo *AuthRepository, jwtManager JWTManager, config *config.Config) *authService {
 	return &authService{
 		repo: repo,
 		jwtManager: jwtManager,
