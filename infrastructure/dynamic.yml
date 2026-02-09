@@ -1,14 +1,20 @@
 http:
   routers:
     auth-router:
-      rule: "PathPrefix(`/auth`)"
+      rule: "PathPrefix(`/api/auth`)"
       service: auth-service
       entryPoints:
         - web
       middlewares:
+        - strip-api
         - auth-strip
 
   middlewares:
+    strip-api:
+      stripPrefix:
+        prefixes:
+          - "/api"
+
     auth-strip:
       stripPrefix:
         prefixes:
