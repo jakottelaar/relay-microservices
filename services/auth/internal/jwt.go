@@ -28,15 +28,17 @@ const (
 	AuthorizationHeader = "Authorization"
 	BearerPrefix        = "Bearer "
 	UserIDKey           = "user_id"
+	SessionIDKey        = "session_id"
 )
 
 type Claims struct {
 	UserID int64  `json:"user_id"`
+	SessionID int64 `json:"session_id"`
 	jwt.RegisteredClaims
 }
 
 type JWTManager interface {
-	GenerateToken(userID int64) (string, error)
+	GenerateToken(userID int64, sessionID int64) (string, error)
 	ValidateToken(tokenString string) (*Claims, error)
 }
 
@@ -44,9 +46,10 @@ type jwtManager struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
 	cfg        *config.Config
+	repo       *AuthRepository
 }
 
-func NewJWTManager(cfg *config.Config) (*jwtManager, error) {
+func NewJWTManager(cfg *config.Config, repo *AuthRepository) (*jwtManager, error) {
 	// Private key only auth service needs this
 	privateKey, err := loadPrivateKey(cfg.PrivateKeyPath)
 	if err != nil {
@@ -63,6 +66,7 @@ func NewJWTManager(cfg *config.Config) (*jwtManager, error) {
 		privateKey: privateKey,
 		publicKey:  publicKey,
 		cfg:        cfg,
+		repo:       repo,
 	}, nil
 }
 
@@ -79,13 +83,14 @@ func NewJWTValidator(cfg *config.Config) (*jwtManager, error) {
 	}, nil
 }
 
-func (m *jwtManager) GenerateToken(userID int64) (string, error) {
+func (m *jwtManager) GenerateToken(userID int64, sessionID int64) (string, error) {
 	if m.privateKey == nil {
 		return "", errors.New("private key not loaded - cannot generate tokens")
 	}
 
 	claims := Claims{
 		UserID: userID,
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.cfg.AccessTokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -198,7 +203,15 @@ func AuthMiddleware(jwtManager *jwtManager) gin.HandlerFunc {
 			return
 		}
 
+		session, err := jwtManager.repo.Queries.GetSessionByID(c.Request.Context(), claims.SessionID)
+		if err != nil || session.RevokedAt.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session revoked or invalid"})
+			c.Abort()
+			return
+		}
+
 		c.Set(UserIDKey, claims.UserID)
+		c.Set(SessionIDKey, claims.SessionID)
 
 		c.Next()
 	}

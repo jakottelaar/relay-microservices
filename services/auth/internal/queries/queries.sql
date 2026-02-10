@@ -64,3 +64,19 @@ SELECT COUNT(*) FROM user_sessions
 WHERE user_account_id = $1 
   AND revoked_at IS NULL 
   AND expires_at > NOW();
+
+-- name: RevokeOldestSession :exec
+UPDATE user_sessions 
+SET revoked_at = NOW()
+WHERE id = (
+    SELECT id FROM user_sessions AS us
+    WHERE us.user_account_id = $1 
+      AND us.revoked_at IS NULL 
+      AND us.expires_at > NOW()
+    ORDER BY us.created_at ASC
+    LIMIT 1
+);
+
+-- name: GetSessionByID :one
+SELECT * FROM user_sessions
+WHERE id = $1 LIMIT 1;

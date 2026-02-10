@@ -24,9 +24,9 @@ type MockJWTManager struct {
     mock.Mock
 }
 
-func (m *MockJWTManager) GenerateToken(userID int64) (string, error) {
-    args := m.Called(userID)
-    return args.String(0), args.Error(1)
+func (m *MockJWTManager) GenerateToken(userID int64, sessionID int64) (string, error) {
+    args := m.Called(userID, sessionID)
+    return args.String(0),  args.Error(1)
 }
 
 func (m *MockJWTManager) ValidateToken(tokenString string) (*internal.Claims, error) {
@@ -95,7 +95,7 @@ func TestSignUp(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("successful sign up", func(t *testing.T) {
-		jwtManager.On("GenerateToken", mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
+		jwtManager.On("GenerateToken", mock.AnythingOfType("int64"), mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
 		
 		req := internal.SignUpRequest{
 			Email: "test@mail.com",
@@ -171,7 +171,7 @@ func TestSignIn(t *testing.T) {
 	email := "signin@mail.com"
 	password := "Password1234!"
 	
-	jwtManager.On("GenerateToken", mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
+	jwtManager.On("GenerateToken", mock.AnythingOfType("int64"), mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
 	
 	sessionMeta := internal.SessionMetadata{
 		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

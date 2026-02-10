@@ -15,8 +15,10 @@ type Querier interface {
 	DeleteAccount(ctx context.Context, id int64) error
 	GetAccountByEmail(ctx context.Context, email string) (UserAccount, error)
 	GetAccountByID(ctx context.Context, id int64) (UserAccount, error)
+	GetSessionByID(ctx context.Context, id int64) (UserSession, error)
 	GetSessionByTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error)
 	RevokeAllUserSessions(ctx context.Context, userAccountID int64) error
+	RevokeOldestSession(ctx context.Context, userAccountID int64) error
 	RevokeSession(ctx context.Context, id int64) error
 	UpdateLastLogin(ctx context.Context, id int64) error
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error

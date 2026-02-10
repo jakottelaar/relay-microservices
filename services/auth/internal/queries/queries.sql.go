@@ -144,6 +144,28 @@ func (q *Queries) GetAccountByID(ctx context.Context, id int64) (UserAccount, er
 	return i, err
 }
 
+const getSessionByID = `-- name: GetSessionByID :one
+SELECT id, user_account_id, refresh_token_hash, user_agent, ip_address, expires_at, revoked_at, last_used_at, created_at FROM user_sessions
+WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetSessionByID(ctx context.Context, id int64) (UserSession, error) {
+	row := q.db.QueryRow(ctx, getSessionByID, id)
+	var i UserSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserAccountID,
+		&i.RefreshTokenHash,
+		&i.UserAgent,
+		&i.IpAddress,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.LastUsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
 SELECT id, user_account_id, refresh_token_hash, user_agent, ip_address, expires_at, revoked_at, last_used_at, created_at FROM user_sessions 
 WHERE refresh_token_hash = $1 
@@ -177,6 +199,24 @@ WHERE user_account_id = $1 AND revoked_at IS NULL
 
 func (q *Queries) RevokeAllUserSessions(ctx context.Context, userAccountID int64) error {
 	_, err := q.db.Exec(ctx, revokeAllUserSessions, userAccountID)
+	return err
+}
+
+const revokeOldestSession = `-- name: RevokeOldestSession :exec
+UPDATE user_sessions 
+SET revoked_at = NOW()
+WHERE id = (
+    SELECT id FROM user_sessions AS us
+    WHERE us.user_account_id = $1 
+      AND us.revoked_at IS NULL 
+      AND us.expires_at > NOW()
+    ORDER BY us.created_at ASC
+    LIMIT 1
+)
+`
+
+func (q *Queries) RevokeOldestSession(ctx context.Context, userAccountID int64) error {
+	_, err := q.db.Exec(ctx, revokeOldestSession, userAccountID)
 	return err
 }
 

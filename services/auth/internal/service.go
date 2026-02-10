@@ -58,7 +58,7 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
 		return nil, NewInternalServerError("failed to create user: " + err.Error())
 	}
 
-	authResp, err := s.createAuthResponse(ctx, &Account{
+	authResp, err := s.createSessionAndTokens(ctx, &Account{
 		ID:        createdAccount.ID,
 		Email:     createdAccount.Email,
 		CreatedAt: createdAccount.CreatedAt.Time,
@@ -84,7 +84,7 @@ func (s *authService) SignIn(ctx context.Context, req SignInRequest, metadata Se
 		return nil, NewUnauthorizedError("invalid email or password")
 	}
 
-	authResp, err := s.createAuthResponse(ctx, &Account{
+	authResp, err := s.createSessionAndTokens(ctx, &Account{
 		ID:        account.ID,
 		Email:     account.Email,
 		CreatedAt: account.CreatedAt.Time,
@@ -102,10 +102,19 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string, met
 	session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, NewUnauthorizedError("Invalid or expired refresh token")
+			return nil, NewUnauthorizedError("invalid or expired refresh token")
 		}
 		return nil, NewInternalServerError("failed to fetch session")
 	}
+
+	if session.RevokedAt.Valid {
+		_ = s.repo.Queries.RevokeAllUserSessions(ctx, session.UserAccountID)
+		return nil, NewUnauthorizedError("session reused - all sessions revoked")
+	}
+
+	if session.ExpiresAt.Time.Before(time.Now()) {
+        return nil, NewUnauthorizedError("refresh token expired")
+    }
 
 	if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
 		return nil, NewInternalServerError("failed to revoke old session")
@@ -116,7 +125,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string, met
 		return nil, NewInternalServerError("failed to fetch account")
 	}
 
-	authResp, err := s.createAuthResponse(ctx, &Account{
+	authResp, err := s.createSessionAndTokens(ctx, &Account{
 		ID:        account.ID,
 		Email:     account.Email,
 		CreatedAt: account.CreatedAt.Time,
@@ -152,34 +161,33 @@ func (s *authService) ValidateToken(ctx context.Context, token string) (*Claims,
 	return s.jwtManager.ValidateToken(token)
 }
 
-func (s *authService) createAuthResponse(ctx context.Context, account *Account, metadata SessionMetadata) (*AuthResponse, error) {
-	count, err := s.repo.Queries.CountActiveSessions(ctx, account.ID)
-	if err != nil {
-		return nil, NewInternalServerError("failed to count sessions")
-	}
-	if count >= int64(s.config.MaxSessionsPerUser) {
-		if err := s.repo.Queries.RevokeAllUserSessions(ctx, account.ID); err != nil {
-			return nil, NewInternalServerError("failed to revoke old sessions")
-		}
-	}
+func (s *authService) createSessionAndTokens(
+    ctx context.Context,
+    account *Account,
+    metadata SessionMetadata,
+) (*AuthResponse, error) {
 
+    count, err := s.repo.Queries.CountActiveSessions(ctx, account.ID)
+    if err != nil {
+        return nil, NewInternalServerError("failed to count sessions")
+    }
 
-	accessToken, err := s.jwtManager.GenerateToken(account.ID)
-	if err != nil {
-		return nil, NewInternalServerError("failed to generate access token")
-	}
+    if count >= int64(s.config.MaxSessionsPerUser) {
+        if err := s.repo.Queries.RevokeOldestSession(ctx, account.ID); err != nil {
+            return nil, NewInternalServerError("failed to revoke oldest session")
+        }
+    }
 
-	refreshToken, err := GenerateRefreshToken()
-	if err != nil {
-		return nil, NewInternalServerError("failed to generate refresh token")
-	}
+    refreshToken, err := GenerateRefreshToken()
+    if err != nil {
+        return nil, NewInternalServerError("failed to generate refresh token")
+    }
+    refreshTokenHash := HashRefreshToken(refreshToken)
 
-	refreshTokenHash := HashRefreshToken(refreshToken)
+    sessionID, _ := sf.NextID()
 
-	sessionID, err := sf.NextID()
-	if err != nil {
-		return nil, NewInternalServerError("failed to generate session ID")
-	}
+    expiresAt := pgtype.Timestamptz{}
+    expiresAt.Scan(time.Now().Add(s.config.RefreshTokenExpiry))
 
 	userAgent := pgtype.Text{}
 	if metadata.UserAgent != "" {
@@ -193,25 +201,27 @@ func (s *authService) createAuthResponse(ctx context.Context, account *Account, 
 		}
 	}
 
-	expiresAt := pgtype.Timestamptz{}
-	expiresAt.Scan(time.Now().Add(s.config.RefreshTokenExpiry))
+    _, err = s.repo.Queries.CreateSession(ctx, queries.CreateSessionParams{
+        ID:               int64(sessionID),
+        UserAccountID:    account.ID,
+        RefreshTokenHash: refreshTokenHash,
+        UserAgent:        userAgent,
+        IpAddress:        ipAddr,
+        ExpiresAt:        expiresAt,
+    })
+    if err != nil {
+        return nil, NewInternalServerError("failed to create session")
+    }
 
-	_, err = s.repo.Queries.CreateSession(ctx, queries.CreateSessionParams{
-		ID:               int64(sessionID),
-		UserAccountID:    account.ID,
-		RefreshTokenHash: refreshTokenHash,
-		UserAgent:        userAgent,
-		IpAddress:        ipAddr,
-		ExpiresAt:        expiresAt,
-	})
-	if err != nil {
-		return nil, NewInternalServerError("failed to create session: " + err.Error())
-	}
+    accessToken, err := s.jwtManager.GenerateToken(account.ID, int64(sessionID))
+    if err != nil {
+        return nil, NewInternalServerError("failed to generate access token")
+    }
 
-	return &AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    int(s.config.AccessTokenExpiry.Seconds()),
-		Account:      account,
-	}, nil
+    return &AuthResponse{
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+        ExpiresIn:    int(s.config.AccessTokenExpiry.Seconds()),
+        Account:      account,
+    }, nil
 }
