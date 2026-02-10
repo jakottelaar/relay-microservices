@@ -59,6 +59,22 @@ func main() {
 	r.POST("/refresh", handler.Refresh)
 	r.POST("/sign-out", handler.SignOut)
 
+	r.GET("/validate", internal.ValidateMiddleware(jwtManager), handler.Validate)
+
+	protected := r.Group("")
+    protected.Use(internal.RequireAuth(jwtManager))
+    {
+        protected.POST("/signout-all", func(c *gin.Context) {
+            userID, _ := internal.GetUserID(c)
+            err := service.SignOutAll(c.Request.Context(), userID)
+            if err != nil {
+                _ = c.Error(err)
+                return
+            }
+            c.JSON(200, gin.H{"message": "All sessions revoked"})
+        })
+    }
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
 		Handler: r,

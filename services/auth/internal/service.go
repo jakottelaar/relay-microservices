@@ -13,152 +13,158 @@ import (
 )
 
 type AuthService interface {
-	SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error)
-	SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error)
-	RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error)
-	SignOut(ctx context.Context, refreshToken string) error
+    SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error)
+    SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error)
+    RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error)
+    SignOut(ctx context.Context, refreshToken string) error
+    SignOutAll(ctx context.Context, userID int64) error
 }
 
 type authService struct {
-	repo *AuthRepository
-	jwtManager JWTManager
-	config     *config.Config
+    repo       *AuthRepository
+    jwtManager JWTManager
+    config     *config.Config
 }
 
 func NewAuthService(repo *AuthRepository, jwtManager JWTManager, config *config.Config) *authService {
-	return &authService{
-		repo: repo,
-		jwtManager: jwtManager,
-		config: config,
-	}
+    return &authService{
+        repo:       repo,
+        jwtManager: jwtManager,
+        config:     config,
+    }
 }
 
 func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error) {
-	_, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
-	if err == nil {
-		return nil, NewDuplicateError("Email already registered")
-	}
+    _, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
+    if err == nil {
+        return nil, NewDuplicateError("Email already registered")
+    }
 
-	hashedPassword, err := argon2id.CreateHash(req.Password, argon2id.DefaultParams)
-	if err != nil {
-		return nil, NewInternalServerError("failed to create user")
-	}
+    hashedPassword, err := argon2id.CreateHash(req.Password, argon2id.DefaultParams)
+    if err != nil {
+        return nil, NewInternalServerError("failed to create user")
+    }
 
-	accountId, err := sf.NextID()
-	if err != nil {
-		return nil, NewInternalServerError("failed to generate account ID")
-	}
+    accountId, err := sf.NextID()
+    if err != nil {
+        return nil, NewInternalServerError("failed to generate account ID")
+    }
 
-	createdAccount, err := s.repo.Queries.CreateAccount(ctx, queries.CreateAccountParams{
-		ID:           int64(accountId),
-		Email:        req.Email,
-		PasswordHash: hashedPassword,
-	})
-	if err != nil {
-		return nil, NewInternalServerError("failed to create user: " + err.Error())
-	}
+    createdAccount, err := s.repo.Queries.CreateAccount(ctx, queries.CreateAccountParams{
+        ID:           int64(accountId),
+        Email:        req.Email,
+        PasswordHash: hashedPassword,
+    })
+    if err != nil {
+        return nil, NewInternalServerError("failed to create user: " + err.Error())
+    }
 
-	authResp, err := s.createSessionAndTokens(ctx, &Account{
-		ID:        createdAccount.ID,
-		Email:     createdAccount.Email,
-		CreatedAt: createdAccount.CreatedAt.Time,
-	}, metadata)
-	if err != nil {
-		return nil, err
-	}
+    authResp, err := s.createSessionAndTokens(ctx, &Account{
+        ID:        createdAccount.ID,
+        Email:     createdAccount.Email,
+        CreatedAt: createdAccount.CreatedAt.Time,
+    }, metadata)
+    if err != nil {
+        return nil, err
+    }
 
-	return authResp, nil
+    return authResp, nil
 }
 
 func (s *authService) SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error) {
-	account, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
-	if err != nil {
-		return nil, NewUnauthorizedError("invalid email or password")
-	}
+    account, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
+    if err != nil {
+        return nil, NewUnauthorizedError("invalid email or password")
+    }
 
-	match, err := argon2id.ComparePasswordAndHash(req.Password, account.PasswordHash)
-	if err != nil {
-		return nil, NewInternalServerError("failed to verify password")
-	}
-	if !match {
-		return nil, NewUnauthorizedError("invalid email or password")
-	}
+    match, err := argon2id.ComparePasswordAndHash(req.Password, account.PasswordHash)
+    if err != nil {
+        return nil, NewInternalServerError("failed to verify password")
+    }
+    if !match {
+        return nil, NewUnauthorizedError("invalid email or password")
+    }
 
-	authResp, err := s.createSessionAndTokens(ctx, &Account{
-		ID:        account.ID,
-		Email:     account.Email,
-		CreatedAt: account.CreatedAt.Time,
-	}, metadata)
-	if err != nil {
-		return nil, err
-	}
+    authResp, err := s.createSessionAndTokens(ctx, &Account{
+        ID:        account.ID,
+        Email:     account.Email,
+        CreatedAt: account.CreatedAt.Time,
+    }, metadata)
+    if err != nil {
+        return nil, err
+    }
 
-	return authResp, nil
+    return authResp, nil
 }
 
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error) {
-	tokenHash := HashRefreshToken(refreshToken)
+    tokenHash := HashRefreshToken(refreshToken)
 
-	session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, NewUnauthorizedError("invalid or expired refresh token")
-		}
-		return nil, NewInternalServerError("failed to fetch session")
-	}
+    session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, NewUnauthorizedError("invalid or expired refresh token")
+        }
+        return nil, NewInternalServerError("failed to fetch session")
+    }
 
-	if session.RevokedAt.Valid {
-		_ = s.repo.Queries.RevokeAllUserSessions(ctx, session.UserAccountID)
-		return nil, NewUnauthorizedError("session reused - all sessions revoked")
-	}
+    // Check if session was revoked (reuse detection)
+    if session.RevokedAt.Valid {
+        // Revoke all user sessions as security measure
+        _ = s.repo.Queries.RevokeAllUserSessions(ctx, session.UserAccountID)
+        return nil, NewUnauthorizedError("refresh token reused - all sessions revoked for security")
+    }
 
-	if session.ExpiresAt.Time.Before(time.Now()) {
+    if session.ExpiresAt.Time.Before(time.Now()) {
         return nil, NewUnauthorizedError("refresh token expired")
     }
 
-	if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
-		return nil, NewInternalServerError("failed to revoke old session")
-	}
+    // Revoke old session (refresh token rotation)
+    if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
+        return nil, NewInternalServerError("failed to revoke old session")
+    }
 
-	account, err := s.repo.Queries.GetAccountByID(ctx, session.UserAccountID)
-	if err != nil {
-		return nil, NewInternalServerError("failed to fetch account")
-	}
+    account, err := s.repo.Queries.GetAccountByID(ctx, session.UserAccountID)
+    if err != nil {
+        return nil, NewInternalServerError("failed to fetch account")
+    }
 
-	authResp, err := s.createSessionAndTokens(ctx, &Account{
-		ID:        account.ID,
-		Email:     account.Email,
-		CreatedAt: account.CreatedAt.Time,
-	}, metadata)
-	if err != nil {
-		return nil, err
-	}
+    authResp, err := s.createSessionAndTokens(ctx, &Account{
+        ID:        account.ID,
+        Email:     account.Email,
+        CreatedAt: account.CreatedAt.Time,
+    }, metadata)
+    if err != nil {
+        return nil, err
+    }
 
-	return authResp, nil
+    return authResp, nil
 }
-
 
 func (s *authService) SignOut(ctx context.Context, refreshToken string) error {
-	tokenHash := HashRefreshToken(refreshToken)
+    tokenHash := HashRefreshToken(refreshToken)
 
-	session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			// Already logged out or invalid token
-			return nil
-		}
-		return NewInternalServerError("failed to fetch session")
-	}
+    session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            // Already logged out or invalid token - not an error
+            return nil
+        }
+        return NewInternalServerError("failed to fetch session")
+    }
 
-	if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
-		return NewInternalServerError("failed to revoke session")
-	}
+    if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
+        return NewInternalServerError("failed to revoke session")
+    }
 
-	return nil
+    return nil
 }
 
-func (s *authService) ValidateToken(ctx context.Context, token string) (*Claims, error) {
-	return s.jwtManager.ValidateToken(token)
+func (s *authService) SignOutAll(ctx context.Context, userID int64) error {
+    if err := s.repo.Queries.RevokeAllUserSessions(ctx, userID); err != nil {
+        return NewInternalServerError("failed to revoke all sessions")
+    }
+    return nil
 }
 
 func (s *authService) createSessionAndTokens(
@@ -166,40 +172,47 @@ func (s *authService) createSessionAndTokens(
     account *Account,
     metadata SessionMetadata,
 ) (*AuthResponse, error) {
-
+    // Check active session count
     count, err := s.repo.Queries.CountActiveSessions(ctx, account.ID)
     if err != nil {
         return nil, NewInternalServerError("failed to count sessions")
     }
 
+    // If max sessions reached, revoke oldest
     if count >= int64(s.config.MaxSessionsPerUser) {
         if err := s.repo.Queries.RevokeOldestSession(ctx, account.ID); err != nil {
             return nil, NewInternalServerError("failed to revoke oldest session")
         }
     }
 
+    // Generate refresh token
     refreshToken, err := GenerateRefreshToken()
     if err != nil {
         return nil, NewInternalServerError("failed to generate refresh token")
     }
     refreshTokenHash := HashRefreshToken(refreshToken)
 
-    sessionID, _ := sf.NextID()
+    // Generate session ID
+    sessionID, err := sf.NextID()
+    if err != nil {
+        return nil, NewInternalServerError("failed to generate session ID")
+    }
 
+    // Prepare session data
     expiresAt := pgtype.Timestamptz{}
     expiresAt.Scan(time.Now().Add(s.config.RefreshTokenExpiry))
 
-	userAgent := pgtype.Text{}
-	if metadata.UserAgent != "" {
-		userAgent = pgtype.Text{String: metadata.UserAgent, Valid: true}
-	}
+    userAgent := pgtype.Text{}
+    if metadata.UserAgent != "" {
+        userAgent = pgtype.Text{String: metadata.UserAgent, Valid: true}
+    }
 
-	var ipAddr *netip.Addr
-	if metadata.IPAddress != "" {
-		if addr, err := netip.ParseAddr(metadata.IPAddress); err == nil {
-			ipAddr = &addr
-		}
-	}
+    var ipAddr *netip.Addr
+    if metadata.IPAddress != "" {
+        if addr, err := netip.ParseAddr(metadata.IPAddress); err == nil {
+            ipAddr = &addr
+        }
+    }
 
     _, err = s.repo.Queries.CreateSession(ctx, queries.CreateSessionParams{
         ID:               int64(sessionID),
