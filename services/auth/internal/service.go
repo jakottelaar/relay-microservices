@@ -16,6 +16,7 @@ type AuthService interface {
 	SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error)
 	SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error)
+	SignOut(ctx context.Context, refreshToken string) error
 }
 
 type authService struct {
@@ -125,6 +126,26 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string, met
 	}
 
 	return authResp, nil
+}
+
+
+func (s *authService) SignOut(ctx context.Context, refreshToken string) error {
+	tokenHash := HashRefreshToken(refreshToken)
+
+	session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			// Already logged out or invalid token
+			return nil
+		}
+		return NewInternalServerError("failed to fetch session")
+	}
+
+	if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
+		return NewInternalServerError("failed to revoke session")
+	}
+
+	return nil
 }
 
 func (s *authService) ValidateToken(ctx context.Context, token string) (*Claims, error) {

@@ -56,6 +56,7 @@ func main() {
 	r.POST("/sign-up", handler.SignUp)
 	r.POST("/sign-in", handler.SignIn)
 	r.POST("/refresh", handler.Refresh)
+	r.POST("/sign-out", handler.SignOut)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
