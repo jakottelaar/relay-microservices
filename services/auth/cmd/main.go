@@ -64,15 +64,7 @@ func main() {
 	protected := r.Group("")
     protected.Use(internal.RequireAuth(jwtManager))
     {
-        protected.POST("/signout-all", func(c *gin.Context) {
-            userID, _ := internal.GetUserID(c)
-            err := service.SignOutAll(c.Request.Context(), userID)
-            if err != nil {
-                _ = c.Error(err)
-                return
-            }
-            c.JSON(200, gin.H{"message": "All sessions revoked"})
-        })
+        protected.DELETE("/sessions", handler.RevokeAllSessions)
 		protected.GET("/sessions/:id", handler.GetSessionById)
     }
 

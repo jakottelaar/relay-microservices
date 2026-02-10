@@ -17,7 +17,8 @@ type AuthService interface {
     SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error)
     RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error)
     SignOut(ctx context.Context, refreshToken string) error
-    SignOutAll(ctx context.Context, userID int64) error
+    RevokeAllSessions(ctx context.Context, userID int64) error
+    RevokeSessionById(ctx context.Context, sessionID int64) error
     GetSessionByID(ctx context.Context, sessionID int64) (*SessionResponse, error)
 }
 
@@ -161,7 +162,7 @@ func (s *authService) SignOut(ctx context.Context, refreshToken string) error {
     return nil
 }
 
-func (s *authService) SignOutAll(ctx context.Context, userID int64) error {
+func (s *authService) RevokeAllSessions(ctx context.Context, userID int64) error {
     if err := s.repo.Queries.RevokeAllUserSessions(ctx, userID); err != nil {
         return NewInternalServerError("failed to revoke all sessions")
     }

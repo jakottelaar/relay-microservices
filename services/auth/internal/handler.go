@@ -106,6 +106,22 @@ func (h *AuthHandler) GetSessionById(c *gin.Context) {
     c.JSON(http.StatusOK, session)
 }
 
+func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
+    userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "user ID not found in context"})
+        return
+    }
+
+    err := h.service.RevokeAllSessions(c.Request.Context(), userID.(int64))
+    if err != nil {
+        _ = c.Error(err)
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "All sessions revoked successfully"})
+}
+
 func extractSessionMetadata(c *gin.Context) SessionMetadata {
     return SessionMetadata{
         UserAgent: c.GetHeader("User-Agent"),
