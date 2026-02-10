@@ -18,6 +18,7 @@ type AuthService interface {
     RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error)
     SignOut(ctx context.Context, refreshToken string) error
     SignOutAll(ctx context.Context, userID int64) error
+    GetSessionByID(ctx context.Context, sessionID int64) (*SessionResponse, error)
 }
 
 type authService struct {
@@ -165,6 +166,33 @@ func (s *authService) SignOutAll(ctx context.Context, userID int64) error {
         return NewInternalServerError("failed to revoke all sessions")
     }
     return nil
+}
+
+func (s *authService) GetSessionByID(ctx context.Context, sessionID int64) (*SessionResponse, error) {
+    session, err := s.repo.Queries.GetSessionByID(ctx, sessionID)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, NewNotFoundError("session not found")
+        }
+        return nil, NewInternalServerError("failed to fetch session")
+    }
+
+    var approxLastTimeUsed time.Time
+    if session.LastUsedAt.Valid {
+        approxLastTimeUsed = session.LastUsedAt.Time
+    } else {
+        approxLastTimeUsed = session.CreatedAt.Time
+    }
+
+    response := &SessionResponse{
+        SessionID:          session.ID,
+        ApproxLastTimeUsed: approxLastTimeUsed.Format(time.RFC3339),
+    }
+    if session.UserAgent.Valid {
+        response.Client.UserAgent = session.UserAgent.String
+    }
+    
+    return response, nil
 }
 
 func (s *authService) createSessionAndTokens(

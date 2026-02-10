@@ -2,6 +2,7 @@ package internal
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -86,6 +87,23 @@ func (h *AuthHandler) SignOut(c *gin.Context) {
 // Validate is the endpoint Traefik ForwardAuth calls
 func (h *AuthHandler) Validate(c *gin.Context) {
     c.Status(http.StatusOK)
+}
+
+func (h *AuthHandler) GetSessionById(c *gin.Context) {
+    sessionId := c.Param("id")
+    id, err := strconv.ParseInt(sessionId, 10, 64)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session ID"})
+        return
+    }
+
+    session, err := h.service.GetSessionByID(c.Request.Context(), id)
+    if err != nil {
+        _ = c.Error(err)
+        return
+    }
+
+    c.JSON(http.StatusOK, session)
 }
 
 func extractSessionMetadata(c *gin.Context) SessionMetadata {

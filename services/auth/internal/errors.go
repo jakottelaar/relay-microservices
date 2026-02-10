@@ -33,6 +33,14 @@ func NewUnauthorizedError(msg string) error {
 	}
 }
 
+func NewNotFoundError(msg string) error {
+	return &ServiceError{
+		Code:    http.StatusNotFound,
+		Message: msg,
+		Err:     errors.New(msg),
+	}
+}
+
 func NewDuplicateError(msg string) error {
 	return &ServiceError{
 		Code:    http.StatusConflict,

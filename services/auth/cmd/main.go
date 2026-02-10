@@ -73,6 +73,7 @@ func main() {
             }
             c.JSON(200, gin.H{"message": "All sessions revoked"})
         })
+		protected.GET("/sessions/:id", handler.GetSessionById)
     }
 
 	srv := &http.Server{

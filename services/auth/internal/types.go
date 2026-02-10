@@ -25,3 +25,11 @@ type SessionMetadata struct {
 	UserAgent string `json:"user_agent"`
 	IPAddress string `json:"ip_address"`
 }
+
+type SessionResponse struct {
+	SessionID          int64  `json:"session_id"`
+	ApproxLastTimeUsed string `json:"approx_last_time_used"`
+	Client             struct {
+		UserAgent string `json:"user_agent"`
+	} `json:"client"`
+}
