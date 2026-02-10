@@ -54,6 +54,7 @@ func main() {
 	handler := internal.NewAuthHandler(service)
 
 	r.POST("/sign-up", handler.SignUp)
+	r.POST("/sign-in", handler.SignIn)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

@@ -156,3 +156,62 @@ func TestSignUp(t *testing.T) {
 	})
 
 }
+
+func TestSignIn(t *testing.T) {
+	pool, cleanup := setUpTestDb(t)
+	defer cleanup()
+
+	repo := internal.NewAuthRepository(pool)
+	jwtManager := new(MockJWTManager)
+	cfg := &config.Config{}
+	service := internal.NewAuthService(repo, jwtManager, cfg)
+	ctx := context.Background()
+
+	// Common test data
+	email := "signin@mail.com"
+	password := "Password1234!"
+	
+	jwtManager.On("GenerateToken", mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
+	
+	sessionMeta := internal.SessionMetadata{
+		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+		IPAddress: "192.168.1.100",
+	}
+
+	// Setup: Create test user once
+	_, err := service.SignUp(ctx, internal.SignUpRequest{
+		Email:    email,
+		Password: password,
+	}, sessionMeta)
+	require.NoError(t, err)
+
+	t.Run("Successful sign in", func(t *testing.T) {
+		resp, err := service.SignIn(ctx, internal.SignInRequest{
+			Email:    email,
+			Password: password,
+		}, sessionMeta)
+
+		require.NoError(t, err)
+		assert.Equal(t, "mock-jwt-token", resp.AccessToken)
+		assert.Equal(t, email, resp.Account.Email)
+	})
+
+	t.Run("invalid password fails", func(t *testing.T) {
+		_, err := service.SignIn(ctx, internal.SignInRequest{
+			Email:    email,
+			Password: "WrongPassword!",
+		}, sessionMeta)
+
+		require.Error(t, err)
+		assert.Equal(t, "invalid email or password", err.Error())
+	})
+
+	t.Run("non-existent email fails", func(t *testing.T) {
+		_, err := service.SignIn(ctx, internal.SignInRequest{
+			Email:    "non-existent@mail.com",
+			Password: "SomePassword1234!",
+		}, sessionMeta)
+		require.Error(t, err)
+		assert.Equal(t, "invalid email or password", err.Error())
+	})
+}

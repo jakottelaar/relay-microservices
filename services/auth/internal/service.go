@@ -13,6 +13,7 @@ import (
 
 type AuthService interface {
 	SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error)
+	SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error)
 }
 
 type authService struct {
@@ -58,6 +59,32 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
 		ID:        createdAccount.ID,
 		Email:     createdAccount.Email,
 		CreatedAt: createdAccount.CreatedAt.Time,
+	}, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return authResp, nil
+}
+
+func (s *authService) SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error) {
+	account, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
+	if err != nil {
+		return nil, NewUnauthorizedError("invalid email or password")
+	}
+
+	match, err := argon2id.ComparePasswordAndHash(req.Password, account.PasswordHash)
+	if err != nil {
+		return nil, NewInternalServerError("failed to verify password")
+	}
+	if !match {
+		return nil, NewUnauthorizedError("invalid email or password")
+	}
+
+	authResp, err := s.createAuthResponse(ctx, &Account{
+		ID:        account.ID,
+		Email:     account.Email,
+		CreatedAt: account.CreatedAt.Time,
 	}, metadata)
 	if err != nil {
 		return nil, err

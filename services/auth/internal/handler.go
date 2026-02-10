@@ -35,6 +35,23 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
 	c.JSON(http.StatusCreated, authResp)
 }
 
+func (h *AuthHandler) SignIn(c *gin.Context) {
+	var req SignInRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	metadata := extractSessionMetadata(c)
+	authResp, err := h.service.SignIn(c.Request.Context(), req, metadata)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, authResp)
+}
+
 func extractSessionMetadata(c *gin.Context) SessionMetadata {
 	return SessionMetadata{
 		UserAgent: c.GetHeader("User-Agent"),
