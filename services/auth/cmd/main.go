@@ -65,6 +65,7 @@ func main() {
     protected.Use(internal.RequireAuth(jwtManager))
     {
         protected.DELETE("/sessions", handler.RevokeAllSessions)
+		protected.DELETE("/sessions/:id", handler.RevokeSessionById)
 		protected.GET("/sessions/:id", handler.GetSessionById)
     }
 

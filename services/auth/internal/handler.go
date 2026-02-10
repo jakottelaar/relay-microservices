@@ -107,7 +107,7 @@ func (h *AuthHandler) GetSessionById(c *gin.Context) {
 }
 
 func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
-    userID, exists := c.Get("userID")
+    userID, exists := c.Get("user_id")
     if !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "user ID not found in context"})
         return
@@ -120,6 +120,23 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, gin.H{"message": "All sessions revoked successfully"})
+}
+
+func (h *AuthHandler) RevokeSessionById(c *gin.Context) {
+    sessionId := c.Param("id")
+    id, err := strconv.ParseInt(sessionId, 10, 64)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session ID"})
+        return
+    }
+
+    err = h.service.RevokeSessionById(c.Request.Context(), id)
+    if err != nil {
+        _ = c.Error(err)
+        return
+    }
+
+    c.JSON(http.StatusNoContent, nil)
 }
 
 func extractSessionMetadata(c *gin.Context) SessionMetadata {

@@ -169,6 +169,17 @@ func (s *authService) RevokeAllSessions(ctx context.Context, userID int64) error
     return nil
 }
 
+func (s *authService) RevokeSessionById(ctx context.Context, sessionID int64) error {
+    if err := s.repo.Queries.RevokeSession(ctx, sessionID); err != nil {
+        if err == pgx.ErrNoRows {
+            return NewNotFoundError("session not found")
+        }
+        return NewInternalServerError("failed to revoke session")
+    }
+
+    return nil
+}
+
 func (s *authService) GetSessionByID(ctx context.Context, sessionID int64) (*SessionResponse, error) {
     session, err := s.repo.Queries.GetSessionByID(ctx, sessionID)
     if err != nil {
