@@ -94,7 +94,7 @@ func TestSignUp(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("Successful sign up", func(t *testing.T) {
+	t.Run("successful sign up", func(t *testing.T) {
 		jwtManager.On("GenerateToken", mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
 		
 		req := internal.SignUpRequest{
@@ -185,7 +185,7 @@ func TestSignIn(t *testing.T) {
 	}, sessionMeta)
 	require.NoError(t, err)
 
-	t.Run("Successful sign in", func(t *testing.T) {
+	t.Run("successful sign in", func(t *testing.T) {
 		resp, err := service.SignIn(ctx, internal.SignInRequest{
 			Email:    email,
 			Password: password,

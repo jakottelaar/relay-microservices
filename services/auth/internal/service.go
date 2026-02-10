@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexedwards/argon2id"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal/queries"
@@ -14,6 +15,7 @@ import (
 type AuthService interface {
 	SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error)
 	SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error)
 }
 
 type authService struct {
@@ -79,6 +81,38 @@ func (s *authService) SignIn(ctx context.Context, req SignInRequest, metadata Se
 	}
 	if !match {
 		return nil, NewUnauthorizedError("invalid email or password")
+	}
+
+	authResp, err := s.createAuthResponse(ctx, &Account{
+		ID:        account.ID,
+		Email:     account.Email,
+		CreatedAt: account.CreatedAt.Time,
+	}, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return authResp, nil
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string, metadata SessionMetadata) (*AuthResponse, error) {
+	tokenHash := HashRefreshToken(refreshToken)
+
+	session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, NewUnauthorizedError("Invalid or expired refresh token")
+		}
+		return nil, NewInternalServerError("failed to fetch session")
+	}
+
+	if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
+		return nil, NewInternalServerError("failed to revoke old session")
+	}
+
+	account, err := s.repo.Queries.GetAccountByID(ctx, session.UserAccountID)
+	if err != nil {
+		return nil, NewInternalServerError("failed to fetch account")
 	}
 
 	authResp, err := s.createAuthResponse(ctx, &Account{
