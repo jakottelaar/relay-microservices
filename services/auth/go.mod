@@ -1,6 +1,6 @@
 module github.com/jakottelaar/relay-microservices/services/auth
 
-go 1.25.7
+go 1.26.0
 
 require (
 	github.com/alexedwards/argon2id v1.0.0
@@ -8,12 +8,14 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jakottelaar/relay-microservices/shared v0.0.0-00010101000000-000000000000
 	github.com/joho/godotenv v1.5.1
-	github.com/sony/sonyflake/v2 v2.2.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
 )
+
+replace github.com/jakottelaar/relay-microservices/shared => ../../shared
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
@@ -78,6 +80,7 @@ require (
 	github.com/quic-go/quic-go v0.54.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/sony/sonyflake/v2 v2.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect

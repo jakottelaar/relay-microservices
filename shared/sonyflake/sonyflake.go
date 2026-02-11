@@ -1,4 +1,4 @@
-package internal
+package sonyflake
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ var (
 )
 
 
-func InitSnowflake() error {
+func InitSonyFlake() error {
 	var initErr error
 	once.Do(func() {
 		var st sonyflake.Settings
@@ -29,9 +29,9 @@ func InitSnowflake() error {
 	return initErr
 }
 
-func GenerateSnowflakeID() (int64, error) {
+func GenerateSonyFlakeID() (int64, error) {
 	if sf == nil {
-		return 0, fmt.Errorf("sonyflake not initialized - call InitSnowflake first")
+		return 0, fmt.Errorf("sonyflake not initialized - call InitSonyFlake first")
 	}
 	
 	id, err := sf.NextID()

@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal"
+	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 )
 
 func main() {
@@ -31,8 +32,8 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := internal.InitSnowflake(); err != nil {
-		log.Fatalf("Failed to initialize Snowflake: %v", err)
+	if err := sonyflake.InitSonyFlake(); err != nil {
+		log.Fatalf("Failed to initialize SonyFlake: %v", err)
 	}
 
 	r := gin.Default()

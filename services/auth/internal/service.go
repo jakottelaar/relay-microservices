@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal/queries"
+	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 )
 
 type AuthService interface {
@@ -47,7 +48,7 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
         return nil, NewInternalServerError("failed to create user")
     }
 
-    accountId, err := sf.NextID()
+    accountId, err := sonyflake.GenerateSonyFlakeID()
     if err != nil {
         return nil, NewInternalServerError("failed to generate account ID")
     }
@@ -233,7 +234,7 @@ func (s *authService) createSessionAndTokens(
     refreshTokenHash := HashRefreshToken(refreshToken)
 
     // Generate session ID
-    sessionID, err := sf.NextID()
+    sessionID, err := sonyflake.GenerateSonyFlakeID()
     if err != nil {
         return nil, NewInternalServerError("failed to generate session ID")
     }

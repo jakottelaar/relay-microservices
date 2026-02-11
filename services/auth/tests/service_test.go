@@ -10,6 +10,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal"
+	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -52,7 +53,7 @@ func setUpTestDb(t *testing.T) (*pgxpool.Pool, func()) {
 	)
 	require.NoError(t, err)
 
-	err = internal.InitSnowflake()
+	err = sonyflake.InitSonyFlake()
 	require.NoError(t, err)
 
 	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
