@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal"
+	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"go.uber.org/zap"
@@ -54,10 +55,10 @@ func main() {
 
 	r := gin.Default()
 
-	r.Use(internal.ErrorHandler())
+	r.Use(errors.ErrorHandler())
 	
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
+		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
 	})

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal/queries"
+	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"go.uber.org/zap"
@@ -45,17 +46,17 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
         logger.Warn("Sign-up attempt with already registered email",
             zap.String("email", req.Email),
         )
-        return nil, NewDuplicateError("Email already registered")
+        return nil, errors.NewDuplicateError("Email already registered")
     }
 
     hashedPassword, err := argon2id.CreateHash(req.Password, argon2id.DefaultParams)
     if err != nil {
-        return nil, NewInternalServerError("failed to create user")
+        return nil, errors.NewInternalServerError("failed to create user")
     }
 
     accountId, err := sonyflake.GenerateSonyFlakeID()
     if err != nil {
-        return nil, NewInternalServerError("failed to generate account ID")
+        return nil, errors.NewInternalServerError("failed to generate account ID")
     }
 
     createdAccount, err := s.repo.Queries.CreateAccount(ctx, queries.CreateAccountParams{
@@ -68,7 +69,7 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
             zap.Error(err),
             zap.String("email", req.Email),
         )
-        return nil, NewInternalServerError("failed to create user: " + err.Error())
+        return nil, errors.NewInternalServerError("failed to create user: " + err.Error())
     }
 
     authResp, err := s.createSessionAndTokens(ctx, &Account{
@@ -86,15 +87,15 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
 func (s *authService) SignIn(ctx context.Context, req SignInRequest, metadata SessionMetadata) (*AuthResponse, error) {
     account, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
     if err != nil {
-        return nil, NewUnauthorizedError("invalid email or password")
+        return nil, errors.NewUnauthorizedError("invalid email or password")
     }
 
     match, err := argon2id.ComparePasswordAndHash(req.Password, account.PasswordHash)
     if err != nil {
-        return nil, NewInternalServerError("failed to verify password")
+        return nil, errors.NewInternalServerError("failed to verify password")
     }
     if !match {
-        return nil, NewUnauthorizedError("invalid email or password")
+        return nil, errors.NewUnauthorizedError("invalid email or password")
     }
 
     authResp, err := s.createSessionAndTokens(ctx, &Account{
@@ -115,30 +116,30 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string, met
     session, err := s.repo.Queries.GetSessionByTokenHash(ctx, tokenHash)
     if err != nil {
         if err == pgx.ErrNoRows {
-            return nil, NewUnauthorizedError("invalid or expired refresh token")
+            return nil, errors.NewUnauthorizedError("invalid or expired refresh token")
         }
-        return nil, NewInternalServerError("failed to fetch session")
+        return nil, errors.NewInternalServerError("failed to fetch session")
     }
 
     // Check if session was revoked (reuse detection)
     if session.RevokedAt.Valid {
         // Revoke all user sessions as security measure
         _ = s.repo.Queries.RevokeAllUserSessions(ctx, session.UserAccountID)
-        return nil, NewUnauthorizedError("refresh token reused - all sessions revoked for security")
+        return nil, errors.NewUnauthorizedError("refresh token reused - all sessions revoked for security")
     }
 
     if session.ExpiresAt.Time.Before(time.Now()) {
-        return nil, NewUnauthorizedError("refresh token expired")
+        return nil, errors.NewUnauthorizedError("refresh token expired")
     }
 
     // Revoke old session (refresh token rotation)
     if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
-        return nil, NewInternalServerError("failed to revoke old session")
+        return nil, errors.NewInternalServerError("failed to revoke old session")
     }
 
     account, err := s.repo.Queries.GetAccountByID(ctx, session.UserAccountID)
     if err != nil {
-        return nil, NewInternalServerError("failed to fetch account")
+        return nil, errors.NewInternalServerError("failed to fetch account")
     }
 
     authResp, err := s.createSessionAndTokens(ctx, &Account{
@@ -162,11 +163,11 @@ func (s *authService) SignOut(ctx context.Context, refreshToken string) error {
             // Already logged out or invalid token - not an error
             return nil
         }
-        return NewInternalServerError("failed to fetch session")
+        return errors.NewInternalServerError("failed to fetch session")
     }
 
     if err := s.repo.Queries.RevokeSession(ctx, session.ID); err != nil {
-        return NewInternalServerError("failed to revoke session")
+        return errors.NewInternalServerError("failed to revoke session")
     }
 
     return nil
@@ -174,7 +175,7 @@ func (s *authService) SignOut(ctx context.Context, refreshToken string) error {
 
 func (s *authService) RevokeAllSessions(ctx context.Context, userID int64) error {
     if err := s.repo.Queries.RevokeAllUserSessions(ctx, userID); err != nil {
-        return NewInternalServerError("failed to revoke all sessions")
+        return errors.NewInternalServerError("failed to revoke all sessions")
     }
     return nil
 }
@@ -182,9 +183,9 @@ func (s *authService) RevokeAllSessions(ctx context.Context, userID int64) error
 func (s *authService) RevokeSessionById(ctx context.Context, sessionID int64) error {
     if err := s.repo.Queries.RevokeSession(ctx, sessionID); err != nil {
         if err == pgx.ErrNoRows {
-            return NewNotFoundError("session not found")
+            return errors.NewNotFoundError("session not found")
         }
-        return NewInternalServerError("failed to revoke session")
+        return errors.NewInternalServerError("failed to revoke session")
     }
 
     return nil
@@ -194,9 +195,9 @@ func (s *authService) GetSessionByID(ctx context.Context, sessionID int64) (*Ses
     session, err := s.repo.Queries.GetSessionByID(ctx, sessionID)
     if err != nil {
         if err == pgx.ErrNoRows {
-            return nil, NewNotFoundError("session not found")
+            return nil, errors.NewNotFoundError("session not found")
         }
-        return nil, NewInternalServerError("failed to fetch session")
+        return nil, errors.NewInternalServerError("failed to fetch session")
     }
 
     var approxLastTimeUsed time.Time
@@ -225,27 +226,27 @@ func (s *authService) createSessionAndTokens(
     // Check active session count
     count, err := s.repo.Queries.CountActiveSessions(ctx, account.ID)
     if err != nil {
-        return nil, NewInternalServerError("failed to count sessions")
+        return nil, errors.NewInternalServerError("failed to count sessions")
     }
 
     // If max sessions reached, revoke oldest
     if count >= int64(s.config.MaxSessionsPerUser) {
         if err := s.repo.Queries.RevokeOldestSession(ctx, account.ID); err != nil {
-            return nil, NewInternalServerError("failed to revoke oldest session")
+            return nil, errors.NewInternalServerError("failed to revoke oldest session")
         }
     }
 
     // Generate refresh token
     refreshToken, err := GenerateRefreshToken()
     if err != nil {
-        return nil, NewInternalServerError("failed to generate refresh token")
+        return nil, errors.NewInternalServerError("failed to generate refresh token")
     }
     refreshTokenHash := HashRefreshToken(refreshToken)
 
     // Generate session ID
     sessionID, err := sonyflake.GenerateSonyFlakeID()
     if err != nil {
-        return nil, NewInternalServerError("failed to generate session ID")
+        return nil, errors.NewInternalServerError("failed to generate session ID")
     }
 
     // Prepare session data
@@ -273,12 +274,12 @@ func (s *authService) createSessionAndTokens(
         ExpiresAt:        expiresAt,
     })
     if err != nil {
-        return nil, NewInternalServerError("failed to create session")
+        return nil, errors.NewInternalServerError("failed to create session")
     }
 
     accessToken, err := s.jwtManager.GenerateToken(account.ID, int64(sessionID))
     if err != nil {
-        return nil, NewInternalServerError("failed to generate access token")
+        return nil, errors.NewInternalServerError("failed to generate access token")
     }
 
     return &AuthResponse{
