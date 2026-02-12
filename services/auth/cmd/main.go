@@ -13,7 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal"
+	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -22,6 +24,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	if err := logger.Init(cfg.Env); err != nil {
+		panic("Failed to initialize logger: " + err.Error())
+	}
+	defer logger.Log.Sync()
+
+	logger.Info("Starting auth service",
+		zap.String("env", cfg.Env),
+		zap.String("port", cfg.Port),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -58,6 +58,7 @@ func LoadConfig() (*Config, error) {
 	jwtIssuer := getEnv("JWT_ISSUER", "relay-auth")
 	
 	return &Config{
+		Env: env,
 		Port: port,
 		DB: DBConfig{
 			DatabaseUrl: databaseUrl,
