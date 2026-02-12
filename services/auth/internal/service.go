@@ -10,7 +10,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal/queries"
+	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
+	"go.uber.org/zap"
 )
 
 type AuthService interface {
@@ -40,6 +42,9 @@ func NewAuthService(repo *AuthRepository, jwtManager JWTManager, config *config.
 func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error) {
     _, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
     if err == nil {
+        logger.Warn("Sign-up attempt with already registered email",
+            zap.String("email", req.Email),
+        )
         return nil, NewDuplicateError("Email already registered")
     }
 
@@ -59,6 +64,10 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
         PasswordHash: hashedPassword,
     })
     if err != nil {
+        logger.Error("Database error creating account",
+            zap.Error(err),
+            zap.String("email", req.Email),
+        )
         return nil, NewInternalServerError("failed to create user: " + err.Error())
     }
 

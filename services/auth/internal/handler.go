@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jakottelaar/relay-microservices/shared/logger"
+	"go.uber.org/zap"
 )
 
 type AuthHandler struct {
@@ -20,16 +22,34 @@ func NewAuthHandler(service AuthService) *AuthHandler {
 func (h *AuthHandler) SignUp(c *gin.Context) {
     var req SignUpRequest
     if err := c.BindJSON(&req); err != nil {
+        logger.Warn("Invalid request body",
+            zap.Error(err),
+            zap.String("path", c.Request.URL.Path),
+        )
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
     }
 
+    logger.Info("Sign-up attempt",
+        zap.String("email", req.Email),
+        zap.String("ip", c.ClientIP()),
+    )
+
     metadata := extractSessionMetadata(c)
     authResp, err := h.service.SignUp(c.Request.Context(), req, metadata)
     if err != nil {
+        logger.Error("Sign-up failed",
+            zap.Error(err),
+            zap.String("email", req.Email),
+        )
         _ = c.Error(err)
         return
     }
+
+    logger.Info("Sign-up successful",
+        zap.String("email", req.Email),
+        zap.Int64("account_id", authResp.Account.ID),
+    )
 
     c.JSON(http.StatusCreated, authResp)
 }

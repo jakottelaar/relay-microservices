@@ -40,12 +40,16 @@ func main() {
 
 	pool, err := internal.NewPool(ctx, cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal("Failed to create database pool",
+		 zap.Error(err),
+		)
 	}
 	defer pool.Close()
 
 	if err := sonyflake.InitSonyFlake(); err != nil {
-		log.Fatalf("Failed to initialize SonyFlake: %v", err)
+		logger.Fatal("Failed to initialize Sonyflake",
+		 zap.Error(err),
+		)
 	}
 
 	r := gin.Default()
@@ -62,7 +66,9 @@ func main() {
 	repo := internal.NewAuthRepository(pool)
 	jwtManager, err := internal.NewJWTManager(cfg, repo)
 	if err != nil {
-		log.Fatalf("Failed to initialize JWT manager: %v", err)
+		logger.Fatal("Failed to create JWT manager",
+		 zap.Error(err),
+		)
 	}
 	service := internal.NewAuthService(repo, jwtManager, cfg)
 	handler := internal.NewAuthHandler(service)
@@ -88,9 +94,15 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Server starting on port %s", cfg.Port)
+		logger.Info(
+			fmt.Sprintf("Auth service is running on port %s", cfg.Port),
+			zap.String("port", cfg.Port),
+		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Fatal(
+				"Failed to start server",
+				zap.Error(err),
+			)
 		}
 	}()
 
@@ -98,14 +110,17 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	logger.Info("Shutting down server...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Fatal(
+			"Failed to gracefully shutdown server",
+			zap.Error(err),
+		)
 	}
 
-	log.Println("Server exited")
+	logger.Info("Server exited")
 }
