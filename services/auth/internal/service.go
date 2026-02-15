@@ -11,8 +11,8 @@ import (
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal/queries"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
-	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
+	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
@@ -30,20 +30,24 @@ type authService struct {
     repo       *AuthRepository
     jwtManager JWTManager
     config     *config.Config
+    nc         *nats.Conn
+    log *zap.Logger
 }
 
-func NewAuthService(repo *AuthRepository, jwtManager JWTManager, config *config.Config) *authService {
+func NewAuthService(repo *AuthRepository, jwtManager JWTManager, config *config.Config, nc *nats.Conn, log *zap.Logger) *authService {
     return &authService{
         repo:       repo,
         jwtManager: jwtManager,
         config:     config,
+        nc:         nc,
+        log:        log,
     }
 }
 
 func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata SessionMetadata) (*AuthResponse, error) {
     _, err := s.repo.Queries.GetAccountByEmail(ctx, req.Email)
     if err == nil {
-        logger.Warn("Sign-up attempt with already registered email",
+        s.log.Warn("Sign-up attempt with already registered email",
             zap.String("email", req.Email),
         )
         return nil, errors.NewDuplicateError("Email already registered")
@@ -51,6 +55,9 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
 
     hashedPassword, err := argon2id.CreateHash(req.Password, argon2id.DefaultParams)
     if err != nil {
+        s.log.Error("Failed to hash password",
+            zap.Error(err),
+        )
         return nil, errors.NewInternalServerError("failed to create user")
     }
 
@@ -65,7 +72,7 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
         PasswordHash: hashedPassword,
     })
     if err != nil {
-        logger.Error("Database error creating account",
+        s.log.Error("Database error creating account",
             zap.Error(err),
             zap.String("email", req.Email),
         )

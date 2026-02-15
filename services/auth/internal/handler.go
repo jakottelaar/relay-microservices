@@ -5,24 +5,25 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"go.uber.org/zap"
 )
 
 type AuthHandler struct {
     service AuthService
+    log     *zap.Logger
 }
 
-func NewAuthHandler(service AuthService) *AuthHandler {
+func NewAuthHandler(service AuthService, log *zap.Logger) *AuthHandler {
     return &AuthHandler{
         service: service,
+        log:     log,
     }
 }
 
 func (h *AuthHandler) SignUp(c *gin.Context) {
     var req SignUpRequest
     if err := c.BindJSON(&req); err != nil {
-        logger.Warn("Invalid request body",
+        h.log.Warn("Invalid request body",
             zap.Error(err),
             zap.String("path", c.Request.URL.Path),
         )
@@ -30,7 +31,7 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
         return
     }
 
-    logger.Info("Sign-up attempt",
+    h.log.Info("Sign-up attempt",
         zap.String("email", req.Email),
         zap.String("ip", c.ClientIP()),
     )
@@ -38,7 +39,7 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
     metadata := extractSessionMetadata(c)
     authResp, err := h.service.SignUp(c.Request.Context(), req, metadata)
     if err != nil {
-        logger.Error("Sign-up failed",
+        h.log.Error("Sign-up failed",
             zap.Error(err),
             zap.String("email", req.Email),
         )
@@ -46,7 +47,7 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
         return
     }
 
-    logger.Info("Sign-up successful",
+    h.log.Info("Sign-up successful",
         zap.String("email", req.Email),
         zap.Int64("account_id", authResp.Account.ID),
     )
@@ -57,6 +58,10 @@ func (h *AuthHandler) SignUp(c *gin.Context) {
 func (h *AuthHandler) SignIn(c *gin.Context) {
     var req SignInRequest
     if err := c.BindJSON(&req); err != nil {
+        h.log.Warn("Invalid request body",
+            zap.Error(err),
+            zap.String("path", c.Request.URL.Path),
+        )
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
     }
@@ -64,6 +69,9 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
     metadata := extractSessionMetadata(c)
     authResp, err := h.service.SignIn(c.Request.Context(), req, metadata)
     if err != nil {
+        h.log.Error("Sign-in failed",
+            zap.Error(err),
+        )
         _ = c.Error(err)
         return
     }

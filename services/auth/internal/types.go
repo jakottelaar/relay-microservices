@@ -3,6 +3,7 @@ package internal
 type SignUpRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
+	Username string `json:"username" binding:"required,min=3,max=30"`
 }
 
 type SignInRequest struct {

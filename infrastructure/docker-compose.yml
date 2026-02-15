@@ -30,6 +30,15 @@ services:
     networks:
       - relay-network
 
+  nats:
+    image: nats:latest
+    container_name: relay-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - relay-network
+
   auth:
     build: ../services/auth
     env_file:

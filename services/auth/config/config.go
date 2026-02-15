@@ -17,6 +17,7 @@ type Config struct {
     RefreshTokenExpiry time.Duration
     MaxSessionsPerUser int
     JWTIssuer          string
+	NatsURL            string
 }
 
 type DBConfig struct {
@@ -56,7 +57,8 @@ func LoadConfig() (*Config, error) {
 	refreshTokenExpiry := time.Duration(getEnvInt("REFRESH_TOKEN_EXPIRY", 168)) * time.Hour
 	maxSessionsPerUser := getEnvInt("MAX_SESSIONS_PER_USER", 5)
 	jwtIssuer := getEnv("JWT_ISSUER", "relay-auth")
-	
+	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
+
 	return &Config{
 		Env: env,
 		Port: port,
@@ -72,6 +74,7 @@ func LoadConfig() (*Config, error) {
 		RefreshTokenExpiry: refreshTokenExpiry,
 		MaxSessionsPerUser: maxSessionsPerUser,
 		JWTIssuer: jwtIssuer,
+		NatsURL: natsURL,
 	}, nil
 
 }

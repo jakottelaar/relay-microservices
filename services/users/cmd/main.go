@@ -25,12 +25,13 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if err := logger.Init(cfg.Env); err != nil {
+	log, err := logger.NewLogger(cfg.Env)
+	if err != nil {
 		panic("Failed to initialize logger: " + err.Error())
 	}
-	defer logger.Log.Sync()
+	defer log.Sync()
 
-	logger.Info("Starting users service",
+	log.Info("Starting users service",
 		zap.String("env", cfg.Env),
 		zap.String("port", cfg.Port),
 	)
@@ -40,15 +41,15 @@ func main() {
 
 	pool, err := internal.NewPool(ctx, cfg)
 	if err != nil {
-		logger.Fatal("Failed to create database pool",
-		 zap.Error(err),
+		log.Fatal("Failed to create database pool",
+			zap.Error(err),
 		)
 	}
 	defer pool.Close()
 
 	if err := sonyflake.InitSonyFlake(); err != nil {
-		logger.Fatal("Failed to initialize Sonyflake",
-		 zap.Error(err),
+		log.Fatal("Failed to initialize Sonyflake",
+			zap.Error(err),
 		)
 	}
 
@@ -66,12 +67,12 @@ func main() {
 	}
 
 	go func() {
-		logger.Info(
+		log.Info(
 			fmt.Sprintf("Users service is running on port %s", cfg.Port),
 			zap.String("port", cfg.Port),
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal(
+			log.Fatal(
 				"Failed to start server",
 				zap.Error(err),
 			)
@@ -82,18 +83,18 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down server...")
+	log.Info("Shutting down server...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Fatal(
+		log.Fatal(
 			"Failed to gracefully shutdown server",
 			zap.Error(err),
 		)
 	}
 
-	logger.Info("Server exited")
+	log.Info("Server exited")
 
 }

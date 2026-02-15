@@ -16,6 +16,7 @@ import (
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
+	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
@@ -26,12 +27,14 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if err := logger.Init(cfg.Env); err != nil {
+	log, err := logger.NewLogger(cfg.Env)
+	if err != nil {
 		panic("Failed to initialize logger: " + err.Error())
 	}
-	defer logger.Log.Sync()
+	defer log.Sync()
 
-	logger.Info("Starting auth service",
+
+	log.Info("Starting auth service",
 		zap.String("env", cfg.Env),
 		zap.String("port", cfg.Port),
 	)
@@ -41,15 +44,23 @@ func main() {
 
 	pool, err := internal.NewPool(ctx, cfg)
 	if err != nil {
-		logger.Fatal("Failed to create database pool",
-		 zap.Error(err),
+		log.Fatal("Failed to create database pool",
+			zap.Error(err),
 		)
 	}
 	defer pool.Close()
 
+	nc, err := nats.Connect(cfg.NatsURL)
+	if err != nil {
+		log.Fatal("Failed to connect to NATS",
+			zap.Error(err),
+		)
+	}
+	defer nc.Close()
+
 	if err := sonyflake.InitSonyFlake(); err != nil {
-		logger.Fatal("Failed to initialize Sonyflake",
-		 zap.Error(err),
+		log.Fatal("Failed to initialize Sonyflake",
+			zap.Error(err),
 		)
 	}
 
@@ -67,12 +78,12 @@ func main() {
 	repo := internal.NewAuthRepository(pool)
 	jwtManager, err := internal.NewJWTManager(cfg, repo)
 	if err != nil {
-		logger.Fatal("Failed to create JWT manager",
-		 zap.Error(err),
+		log.Fatal("Failed to create JWT manager",
+			zap.Error(err),
 		)
 	}
-	service := internal.NewAuthService(repo, jwtManager, cfg)
-	handler := internal.NewAuthHandler(service)
+	service := internal.NewAuthService(repo, jwtManager, cfg, nc, log)
+    handler := internal.NewAuthHandler(service, log)
 
 	r.POST("/sign-up", handler.SignUp)
 	r.POST("/sign-in", handler.SignIn)
@@ -95,12 +106,12 @@ func main() {
 	}
 
 	go func() {
-		logger.Info(
+		log.Info(
 			fmt.Sprintf("Auth service is running on port %s", cfg.Port),
 			zap.String("port", cfg.Port),
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal(
+			log.Fatal(
 				"Failed to start server",
 				zap.Error(err),
 			)
@@ -111,17 +122,17 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down server...")
+	log.Info("Shutting down server...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Fatal(
+		log.Fatal(
 			"Failed to gracefully shutdown server",
 			zap.Error(err),
 		)
 	}
 
-	logger.Info("Server exited")
+	log.Info("Server exited")
 }
