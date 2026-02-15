@@ -13,8 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/services/users/config"
 	"github.com/jakottelaar/relay-microservices/services/users/internal"
+	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
+	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
@@ -47,19 +49,38 @@ func main() {
 	}
 	defer pool.Close()
 
+	nc, err := nats.Connect(cfg.NatsURL)
+	if err != nil {
+		log.Fatal("Failed to connect to NATS",
+			zap.Error(err),
+		)
+	}
+	defer nc.Close()
+
 	if err := sonyflake.InitSonyFlake(); err != nil {
 		log.Fatal("Failed to initialize Sonyflake",
 			zap.Error(err),
 		)
 	}
 
+	repo := internal.NewUserRepository(pool)
+	service := internal.NewUserService(repo, log)
+	
+	eventHandler := internal.NewEventHandler(service, nc, log)
+    if err := eventHandler.SubscribeToEvents(ctx); err != nil {
+        log.Fatal("Failed to subscribe to events", zap.Error(err))
+    }
+
 	r := gin.Default()
+
+	r.Use(errors.ErrorHandler())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
 	})
+
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

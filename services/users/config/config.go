@@ -11,6 +11,7 @@ type Config struct {
 	Env  string
 	Port string
 	DB   DBConfig
+	NatsURL string
 }
 
 type DBConfig struct {
@@ -40,6 +41,7 @@ func LoadConfig() (*Config, error) {
 	minConns := getEnvInt("DB_MIN_CONNS", 2)
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
+	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
 
 
 	return &Config{
@@ -52,6 +54,7 @@ func LoadConfig() (*Config, error) {
 			MaxConnLifetime: maxConnLifetime,
 			MaxConnIdleTime: maxConnIdleTime,
 		},
+		NatsURL: natsURL,
 	}, nil
 }
 

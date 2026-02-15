@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"net/netip"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal/queries"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
+	"github.com/jakottelaar/relay-microservices/shared/events"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
@@ -86,6 +88,28 @@ func (s *authService) SignUp(ctx context.Context, req SignUpRequest, metadata Se
     }, metadata)
     if err != nil {
         return nil, err
+    }
+
+    event := events.UserAccountCreatedEvent{
+        UserID:   createdAccount.ID,
+        Username: req.Username,
+        CreatedAt: createdAccount.CreatedAt.Time,
+    }
+
+    eventData , err := json.Marshal(event)
+    if err != nil {
+        s.log.Error("Failed to marshal user account created event",
+            zap.Error(err),
+            zap.Int64("user_id", createdAccount.ID),
+        )
+    } else {
+        err := s.nc.Publish(events.SubjectUserAccountCreated, eventData)
+        if err != nil {
+            s.log.Error("Failed to publish user account created event",
+                zap.Error(err),
+                zap.Int64("user_id", createdAccount.ID),
+            )
+        }
     }
 
     return authResp, nil
