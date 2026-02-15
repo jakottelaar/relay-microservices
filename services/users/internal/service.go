@@ -3,7 +3,10 @@ package internal
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jakottelaar/relay-microservices/services/users/config"
 	"github.com/jakottelaar/relay-microservices/services/users/internal/queries"
+	"github.com/minio/minio-go/v7"
 	"go.uber.org/zap"
 )
 
@@ -12,14 +15,18 @@ type UserService interface {
 }
 
 type userService struct {
-	repo *UserRepository
-	log *zap.Logger
+	repo    *UserRepository
+	log 	*zap.Logger
+	minio   *minio.Client
+	cfg     *config.Config
 }
 
-func NewUserService(repo *UserRepository, log *zap.Logger) *userService {
+func NewUserService(repo *UserRepository, log *zap.Logger, minio *minio.Client, cfg *config.Config) *userService {
 	return &userService{
 		repo: repo,
 		log: log,
+		minio: minio,
+		cfg: cfg,
 	}
 }
 
@@ -33,6 +40,7 @@ func (s *userService) CreateUser(ctx context.Context, req *CreateUserRequest) er
 	_, err := s.repo.CreateUser(ctx, queries.CreateUserParams{
 		ID: req.UserID,
 		Username: req.Username,
+		Avatar: pgtype.Text{String: s.cfg.Minio.DefaultAvatar, Valid: true},
 	})
 
 	if err != nil {

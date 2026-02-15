@@ -52,6 +52,18 @@ services:
     networks:
       - relay-network
 
+  minio:
+    image: minio/minio:latest
+    container_name: relay-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - .env
+    command: server /data --console-address ":9001"
+    networks:
+      - relay-network
+
 volumes:
   postgres_data:
 

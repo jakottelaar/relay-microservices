@@ -57,6 +57,13 @@ func main() {
 	}
 	defer nc.Close()
 
+	minio, err := internal.NewMinioClient(cfg)
+	if err != nil {
+		log.Fatal("Failed to initialize MinIO client",
+			zap.Error(err),
+		)
+	}
+	
 	if err := sonyflake.InitSonyFlake(); err != nil {
 		log.Fatal("Failed to initialize Sonyflake",
 			zap.Error(err),
@@ -64,7 +71,7 @@ func main() {
 	}
 
 	repo := internal.NewUserRepository(pool)
-	service := internal.NewUserService(repo, log)
+	service := internal.NewUserService(repo, log, minio, cfg)
 	
 	eventHandler := internal.NewEventHandler(service, nc, log)
     if err := eventHandler.SubscribeToEvents(ctx); err != nil {

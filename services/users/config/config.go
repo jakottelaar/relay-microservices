@@ -11,6 +11,7 @@ type Config struct {
 	Env  string
 	Port string
 	DB   DBConfig
+	Minio MinioConfig
 	NatsURL string
 }
 
@@ -20,6 +21,14 @@ type DBConfig struct {
 	MinConns        int32
 	MaxConnLifetime int
 	MaxConnIdleTime int
+}
+
+type MinioConfig struct {
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
+	UseSSL          bool
+	DefaultAvatar   string
 }
 
 func LoadConfig() (*Config, error) {
@@ -41,6 +50,16 @@ func LoadConfig() (*Config, error) {
 	minConns := getEnvInt("DB_MIN_CONNS", 2)
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
+
+	minioEndpoint := getEnv("MINIO_ENDPOINT", "")
+	if minioEndpoint == "" {
+		return nil, fmt.Errorf("MINIO_ENDPOINT environment variable is required")
+	}
+	minioAccessKeyID := getEnv("MINIO_ACCESS_KEY_ID", "")
+	minioSecretAccessKey := getEnv("MINIO_SECRET_ACCESS_KEY", "")
+	minioUseSSL := getEnvBool("MINIO_USE_SSL", false)
+	minioDefaultAvatar := getEnv("MINIO_DEFAULT_AVATAR", "")
+
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
 
 
@@ -55,6 +74,13 @@ func LoadConfig() (*Config, error) {
 			MaxConnIdleTime: maxConnIdleTime,
 		},
 		NatsURL: natsURL,
+		Minio: MinioConfig{
+			Endpoint:        minioEndpoint,
+			AccessKeyID:     minioAccessKeyID,
+			SecretAccessKey: minioSecretAccessKey,
+			UseSSL:          minioUseSSL,
+			DefaultAvatar:   minioDefaultAvatar,
+		},
 	}, nil
 }
 
@@ -72,6 +98,13 @@ func getEnvInt(key string, fallback int) int {
 		if err == nil {
 			return intValue
 		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if value := os.Getenv(key); value != "" {
+		return value == "true"
 	}
 	return fallback
 }
