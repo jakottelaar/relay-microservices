@@ -11,7 +11,7 @@ type Config struct {
 	Env  string
 	Port string
 	DB   DBConfig
-	Minio MinioConfig
+	Storage StorageConfig
 	NatsURL string
 }
 
@@ -23,12 +23,13 @@ type DBConfig struct {
 	MaxConnIdleTime int
 }
 
-type MinioConfig struct {
-	Endpoint        string
-	AccessKeyID     string
-	SecretAccessKey string
-	UseSSL          bool
-	DefaultAvatar   string
+type StorageConfig struct {
+    Endpoint         string
+    AccessKeyID      string
+    SecretAccessKey  string
+    UseSSL           bool
+    Bucket           string
+    DefaultAvatarURL string
 }
 
 func LoadConfig() (*Config, error) {
@@ -51,14 +52,14 @@ func LoadConfig() (*Config, error) {
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
 
-	minioEndpoint := getEnv("MINIO_ENDPOINT", "")
-	if minioEndpoint == "" {
-		return nil, fmt.Errorf("MINIO_ENDPOINT environment variable is required")
+	storageConfig := StorageConfig{
+		Endpoint:         getEnv("S3_ENDPOINT", "seaweedfs-s3:8333"),
+		AccessKeyID:      getEnv("S3_ACCESS_KEY_ID", "any"),
+		SecretAccessKey:  getEnv("S3_SECRET_ACCESS_KEY", "any"),
+		UseSSL:           getEnvBool("S3_USE_SSL", false),
+		Bucket:           getEnv("S3_BUCKET", "relay-avatars"),
+		DefaultAvatarURL: getEnv("S3_DEFAULT_AVATAR_URL", ""),
 	}
-	minioAccessKeyID := getEnv("MINIO_ACCESS_KEY_ID", "")
-	minioSecretAccessKey := getEnv("MINIO_SECRET_ACCESS_KEY", "")
-	minioUseSSL := getEnvBool("MINIO_USE_SSL", false)
-	minioDefaultAvatar := getEnv("MINIO_DEFAULT_AVATAR", "")
 
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
 
@@ -73,14 +74,8 @@ func LoadConfig() (*Config, error) {
 			MaxConnLifetime: maxConnLifetime,
 			MaxConnIdleTime: maxConnIdleTime,
 		},
+		Storage: storageConfig,
 		NatsURL: natsURL,
-		Minio: MinioConfig{
-			Endpoint:        minioEndpoint,
-			AccessKeyID:     minioAccessKeyID,
-			SecretAccessKey: minioSecretAccessKey,
-			UseSSL:          minioUseSSL,
-			DefaultAvatar:   minioDefaultAvatar,
-		},
 	}, nil
 }
 

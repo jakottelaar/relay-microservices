@@ -11,51 +11,48 @@ import (
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, req *CreateUserRequest) error
+    CreateUser(ctx context.Context, req *CreateUserRequest) error
 }
 
 type userService struct {
-	repo    *UserRepository
-	log 	*zap.Logger
-	minio   *minio.Client
-	cfg     *config.Config
+    repo    *UserRepository
+    log     *zap.Logger
+    storage *minio.Client
+    cfg     *config.Config
 }
 
-func NewUserService(repo *UserRepository, log *zap.Logger, minio *minio.Client, cfg *config.Config) *userService {
-	return &userService{
-		repo: repo,
-		log: log,
-		minio: minio,
-		cfg: cfg,
-	}
+func NewUserService(repo *UserRepository, log *zap.Logger, storage *minio.Client, cfg *config.Config) *userService {
+    return &userService{
+        repo:    repo,
+        log:     log,
+        storage: storage,
+        cfg:     cfg,
+    }
 }
 
 func (s *userService) CreateUser(ctx context.Context, req *CreateUserRequest) error {
-	s.log.Info(
-		"Creating user profile",
-		zap.Int64("user_id", req.UserID),
-		zap.String("username", req.Username),
-	)
+    s.log.Info("Creating user profile",
+        zap.Int64("user_id", req.UserID),
+        zap.String("username", req.Username),
+    )
 
-	_, err := s.repo.CreateUser(ctx, queries.CreateUserParams{
-		ID: req.UserID,
-		Username: req.Username,
-		Avatar: pgtype.Text{String: s.cfg.Minio.DefaultAvatar, Valid: true},
-	})
-
-	if err != nil {
-		s.log.Error("Failed to create user profile",
+    _, err := s.repo.CreateUser(ctx, queries.CreateUserParams{
+        ID:       req.UserID,
+        Username: req.Username,
+        Avatar: pgtype.Text{String: s.cfg.Storage.DefaultAvatarURL, Valid: true},
+    })
+    if err != nil {
+        s.log.Error("Failed to create user profile",
             zap.Error(err),
             zap.Int64("user_id", req.UserID),
             zap.String("username", req.Username),
         )
-		return err
-	}
+        return err
+    }
 
-	s.log.Info("User profile created successfully", 
-		zap.Int64("user_id", req.UserID),
-		zap.String("username", req.Username),
-	)
-
-	return nil
+    s.log.Info("User profile created successfully",
+        zap.Int64("user_id", req.UserID),
+        zap.String("username", req.Username),
+    )
+    return nil
 }

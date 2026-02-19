@@ -57,7 +57,7 @@ func main() {
 	}
 	defer nc.Close()
 
-	minio, err := internal.NewMinioClient(cfg)
+	storage, err := internal.NewStorageClient(cfg)
 	if err != nil {
 		log.Fatal("Failed to initialize MinIO client",
 			zap.Error(err),
@@ -71,7 +71,7 @@ func main() {
 	}
 
 	repo := internal.NewUserRepository(pool)
-	service := internal.NewUserService(repo, log, minio, cfg)
+	service := internal.NewUserService(repo, log, storage, cfg)
 	
 	eventHandler := internal.NewEventHandler(service, nc, log)
     if err := eventHandler.SubscribeToEvents(ctx); err != nil {
