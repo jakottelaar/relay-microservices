@@ -18,7 +18,7 @@ type RefreshTokenRequest struct {
 type AuthResponse struct {
 	AccessToken  string   `json:"access_token"`
 	RefreshToken string   `json:"refresh_token"`
-	ExpiresIn    int      `json:"expires_in"` // Expiration time in seconds
+	ExpiresIn    int      `json:"expires_in"`
 	Account      *Account `json:"account"`
 }
 

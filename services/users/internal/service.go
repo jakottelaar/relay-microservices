@@ -3,15 +3,18 @@ package internal
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jakottelaar/relay-microservices/services/users/config"
 	"github.com/jakottelaar/relay-microservices/services/users/internal/queries"
+	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/minio/minio-go/v7"
 	"go.uber.org/zap"
 )
 
 type UserService interface {
     CreateUser(ctx context.Context, req *CreateUserRequest) error
+    GetUserProfile(ctx context.Context, userID int64) (*ProfileResponse, error)
 }
 
 type userService struct {
@@ -55,4 +58,33 @@ func (s *userService) CreateUser(ctx context.Context, req *CreateUserRequest) er
         zap.String("username", req.Username),
     )
     return nil
+}
+
+func (s *userService) GetUserProfile(ctx context.Context, userID int64) (*ProfileResponse, error) {
+    user, err := s.repo.GetUserByID(ctx, userID)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            s.log.Warn("User profile not found",
+                zap.Int64("user_id", userID),
+            )
+            return nil, errors.NewNotFoundError("user not found")
+        }
+
+        s.log.Error("Failed to get user profile",
+            zap.Error(err),
+            zap.Int64("user_id", userID),
+        )
+        return nil, err
+    }
+
+    userResp := &ProfileResponse{
+        ID:       user.ID,
+        Username: user.Username,
+        AvatarURL: user.Avatar.String,
+    }
+
+    s.log.Info("User profile retrieved successfully",
+        zap.Int64("user_id", userID),
+    )
+    return userResp, nil
 }

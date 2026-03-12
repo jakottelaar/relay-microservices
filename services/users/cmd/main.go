@@ -70,14 +70,6 @@ func main() {
 		)
 	}
 
-	repo := internal.NewUserRepository(pool)
-	service := internal.NewUserService(repo, log, storage, cfg)
-	
-	eventHandler := internal.NewEventHandler(service, nc, log)
-    if err := eventHandler.SubscribeToEvents(ctx); err != nil {
-        log.Fatal("Failed to subscribe to events", zap.Error(err))
-    }
-
 	r := gin.Default()
 
 	r.Use(errors.ErrorHandler())
@@ -87,6 +79,18 @@ func main() {
 			"status": "ok",
 		})
 	})
+
+	repo := internal.NewUserRepository(pool)
+	service := internal.NewUserService(repo, log, storage, cfg)
+	handler := internal.NewUserHandler(service)
+	
+	group := r.Group("/users")
+	group.GET("/:id/profile", handler.GetUserProfile)
+	
+	eventHandler := internal.NewEventHandler(service, nc, log)
+    if err := eventHandler.SubscribeToEvents(ctx); err != nil {
+        log.Fatal("Failed to subscribe to events", zap.Error(err))
+    }
 
 
 	srv := &http.Server{
