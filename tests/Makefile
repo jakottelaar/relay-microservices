@@ -12,8 +12,8 @@ test-logs:
 	$(COMPOSE_TEST) logs -f
 
 test: test-up
-	pytest e2e/ -v
+	python -m pytest e2e/ -v
 	$(MAKE) test-down
 
 test-run:
-	pytest e2e/ -v
+	python -m pytest e2e/ -v
