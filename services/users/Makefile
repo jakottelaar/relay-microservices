@@ -27,6 +27,3 @@ migrate-create:
 	@echo "Please fill in the up and down SQL statements in the migration file."
 	@echo "Then run 'make migrate-up' to apply the migration."
 	@echo "Or run 'make migrate-down' to revert the migration."
-
-docker-build:
-	docker build -t relay:latest .
