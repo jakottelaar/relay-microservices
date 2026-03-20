@@ -40,12 +40,31 @@ services:
       - relay-network
 
   auth:
-    build: ../services/auth
+    build:
+      context: ..
+      dockerfile: services/auth/Dockerfile
     env_file:
       - .env
     container_name: relay-auth
     environment:
       - PORT=8080
+      - DATABASE_URL=${AUTH_DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - relay-network
+
+  users:
+    build:
+      context: ..
+      dockerfile: services/users/Dockerfile
+    env_file:
+      - .env
+    container_name: relay-users
+    environment:
+      - PORT=8081
+      - DATABASE_URL=${USERS_DATABASE_URL}
     depends_on:
       postgres:
         condition: service_healthy

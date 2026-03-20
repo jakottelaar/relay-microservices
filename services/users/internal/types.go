@@ -10,7 +10,6 @@ type CreateUserRequest struct {
 type ProfileResponse struct {
 	ID          int64     `json:"id"`
 	Username    string    `json:"username"`
-	DisplayName string    `json:"display_name"`
 	AvatarURL   string    `json:"avatar_url"`
 	Bio         string    `json:"bio"`
 	CreatedAt   time.Time `json:"created_at"`

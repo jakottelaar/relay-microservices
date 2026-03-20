@@ -2,29 +2,23 @@ FROM golang:1.26.0-alpine AS build
 
 WORKDIR /app
 
-# Install dependencies
 RUN apk add --no-cache git
 
-# Copy Go module files
-COPY go.mod go.sum ./
+# Copy shared module so the replace directive resolves
+COPY shared/ ./shared/
 
-WORKDIR /app
+# Copy service module files
+COPY services/auth/ ./services/auth/
 
-# Download dependencies
-RUN go mod download
+WORKDIR /app/services/auth
 
-# Copy application code
-COPY . .
+# Disable workspace, use the replace directive in go.mod instead
+RUN GOWORK=off go mod download
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/main ./cmd/main.go
+RUN GOWORK=off CGO_ENABLED=0 GOOS=linux go build -o /app/main ./cmd/main.go
 
-# Final stage
 FROM alpine:latest
 
 WORKDIR /app
-
-# Copy built binary
 COPY --from=build /app/main .
-
 CMD ["./main"]

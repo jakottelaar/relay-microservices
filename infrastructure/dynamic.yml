@@ -9,6 +9,16 @@ http:
         - strip-api
         - auth-strip
 
+    users-router:
+      rule: "PathPrefix(`/api/users`)"
+      service: users-service
+      entryPoints:
+        - web
+      middlewares:
+        - strip-api
+        - users-strip
+        - forwardauth-middleware
+
   middlewares:
     strip-api:
       stripPrefix:
@@ -20,15 +30,24 @@ http:
         prefixes:
           - "/auth"
 
+    users-strip:
+      stripPrefix:
+        prefixes:
+          - "/users"
+
+    forwardauth-middleware:
+      forwardAuth:
+        address: "http://auth:8080/validate"
+        authResponseHeaders:
+          - "X-User-ID"
+          - "X-Session-ID"
+
   services:
     auth-service:
       loadBalancer:
         servers:
           - url: "http://auth:8080"
-
-  forwardauth-middleware:
-    forwardAuth:
-      address: "http://auth:8080/validate"
-      authResponseHeaders:
-        - "X-User-ID"
-        - "X-Session-ID"
+    users-service:
+      loadBalancer:
+        servers:
+          - url: "http://users:8081"
