@@ -1,25 +1,23 @@
 from httpx import Client
 import pytest
 
-@pytest.fixture(autouse=True)
+USER = {
+    "email": "sign-in-tester@mail.com",
+    "username": "sign-in-tester",
+    "password": "Secret1234",
+}
+
+@pytest.fixture(scope="module", autouse=True)
 def setup_test_account(client: Client):
-    """Creates a test account before each test."""
-    client.post("/auth/sign-up", json={
-        "email": "sign-in-tester@mail.com",
-        "username": "sign-in-tester",
-        "password": "Secret1234",
-    })
+    client.post("/auth/sign-up", json=USER)
     yield
 
-def test_sign_in(client: Client):
-    """Tests the sign-in endpoint by signing in with an existing user."""
-    r = client.post("/auth/sign-in", json={
-                "email": "sign-in-tester@mail.com",
-                "password": "Secret1234",
-    })
+@pytest.fixture(scope="module")
+def user_payload():
+    return USER
 
-    assert r.status_code == 200, r.text
-    body = r.json()
+def test_sign_in(sign_in_user):
+    body = sign_in_user
 
     assert body["access_token"] is not None
     assert body["account"]["id"] is not None
@@ -27,8 +25,8 @@ def test_sign_in(client: Client):
 def test_sign_in_incorrect_password_return_401(client: Client):
     """Tests that signing in with an incorrect password returns a 401 error."""
     r = client.post("/auth/sign-in", json={
-                "email": "sign-in-tester@mail.com",
-                "password": "Secret9999",
+        "email": "sign-in-tester@mail.com",
+        "password": "Secret9999",
     })
 
     assert r.status_code == 401, r.text

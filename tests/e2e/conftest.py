@@ -12,18 +12,17 @@ def client() -> httpx.Client:
     with httpx.Client(base_url=BASE_URL) as client:
         yield client
 
-@pytest.fixture
-def auth_client(signed_in_user, client) -> httpx.Client:
-    token = signed_in_user["access_token"]
+@pytest.fixture(scope="module")
+def sign_in_user(client, user_payload):
+    r = client.post("/auth/sign-in", json=user_payload)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+@pytest.fixture(scope="module")
+def auth_client(sign_in_user) -> httpx.Client:
+    token = sign_in_user["access_token"]
     return httpx.Client(
         base_url=BASE_URL,
         headers={"Authorization": f"Bearer {token}"},
         timeout=10
     )
-
-@pytest.fixture
-def sign_in_user(client, user_payload):
-    """Signs in a user and returns the full response body."""
-    r = client.post("/api/auth/sign-in", json=user_payload)
-    assert r.status_code == 200, r.text
-    return r.json()
