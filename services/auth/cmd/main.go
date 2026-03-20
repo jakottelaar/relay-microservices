@@ -85,14 +85,15 @@ func main() {
 	service := internal.NewAuthService(repo, jwtManager, cfg, nc, log)
     handler := internal.NewAuthHandler(service, log)
 
-	r.POST("/sign-up", handler.SignUp)
-	r.POST("/sign-in", handler.SignIn)
-	r.POST("/refresh", handler.Refresh)
-	r.POST("/sign-out", handler.SignOut)
+	authGroup := r.Group("/auth")
+	authGroup.POST("/sign-up", handler.SignUp)
+	authGroup.POST("/sign-in", handler.SignIn)
+	authGroup.POST("/refresh", handler.Refresh)
+	authGroup.POST("/sign-out", handler.SignOut)
 
-	r.GET("/validate", internal.ValidateMiddleware(jwtManager), handler.Validate)
+	r.GET("/auth/validate", internal.ValidateMiddleware(jwtManager))
 
-	protected := r.Group("")
+	protected := r.Group("/auth")
     protected.Use(internal.RequireAuth(jwtManager))
     {
         protected.DELETE("/sessions", handler.RevokeAllSessions)

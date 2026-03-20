@@ -112,11 +112,6 @@ func (h *AuthHandler) SignOut(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-// Validate is the endpoint Traefik ForwardAuth calls
-func (h *AuthHandler) Validate(c *gin.Context) {
-    c.Status(http.StatusOK)
-}
-
 func (h *AuthHandler) GetSessionById(c *gin.Context) {
     sessionId := c.Param("id")
     id, err := strconv.ParseInt(sessionId, 10, 64)

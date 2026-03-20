@@ -78,9 +78,11 @@ func (s *userService) GetUserProfile(ctx context.Context, userID int64) (*Profil
     }
 
     userResp := &ProfileResponse{
-        ID:       user.ID,
-        Username: user.Username,
-        AvatarURL: user.Avatar.String,
+        ID:         user.ID,
+        Username:   user.Username,
+        AvatarURL:  user.Avatar.String,
+        Bio:        user.Bio.String,
+        CreatedAt:  user.CreatedAt.Time,
     }
 
     s.log.Info("User profile retrieved successfully",
