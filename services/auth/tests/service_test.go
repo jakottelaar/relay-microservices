@@ -10,7 +10,9 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 	"github.com/jakottelaar/relay-microservices/services/auth/internal"
+	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -70,6 +72,35 @@ func setUpTestDb(t *testing.T) (*pgxpool.Pool, func()) {
 	}
 }
 
+func setUpNats(t *testing.T) (*nats.Conn, func()) {
+	ctx := context.Background()
+
+		natsContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:        "nats:2.9-alpine",
+			ExposedPorts:  []string{"4222/tcp"},
+			WaitingFor:   wait.ForLog("Server is ready"),
+		},
+		Started: true,
+	})
+	require.NoError(t, err)
+
+	host, err := natsContainer.Host(ctx)
+	require.NoError(t, err)
+	port, err := natsContainer.MappedPort(ctx, "4222")
+	require.NoError(t, err)
+	natsURL := "nats://" + host + ":" + port.Port()
+
+	nc, err := nats.Connect(natsURL)
+	require.NoError(t, err)
+
+
+	return nc, func() {
+		nc.Close()
+		natsContainer.Terminate(ctx)
+	}
+}
+
 func runMigrations(t *testing.T, connStr string) {
 
 	m, err := migrate.New(
@@ -88,10 +119,15 @@ func TestSignUp(t *testing.T) {
 	pool, cleanup := setUpTestDb(t)
 	defer cleanup()
 
+	nc, natsCleanup := setUpNats(t)
+	defer natsCleanup()
+
+	log := logger.NewTestLogger()
+
 	repo := internal.NewAuthRepository(pool)
 	jwtManager := new(MockJWTManager)
 	cfg := &config.Config{}
-	service := internal.NewAuthService(repo, jwtManager, cfg)
+	service := internal.NewAuthService(repo, jwtManager, cfg, nc, log)
 
 	ctx := context.Background()
 
@@ -103,10 +139,12 @@ func TestSignUp(t *testing.T) {
 			Password: "Password1234!",
 		}
 
-		resp, err := service.SignUp(ctx, req, internal.SessionMetadata{
+		sessionMeta := internal.SessionMetadata{
 			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-			IPAddress:        "192.168.1.100",
-		})
+			IPAddress: "192.168.1.100",
+		}
+
+		resp, err := service.SignUp(ctx, req, sessionMeta)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Account.ID)
 		assert.NotZero(t, resp.Account.ID)
@@ -114,39 +152,40 @@ func TestSignUp(t *testing.T) {
 	})
 
 	t.Run("duplicate email fails", func(t *testing.T) {
-		jwtManager.On("GenerateToken", mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
+		jwtManager.On("GenerateToken", mock.AnythingOfType("int64"), mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
 		
 		req := internal.SignUpRequest{
 			Email:    "duplicate@example.com",
 			Password: "password123",
 		}
 
-		_, err := service.SignUp(ctx, req, internal.SessionMetadata{
+		sessionMeta := internal.SessionMetadata{
 			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-			IPAddress:        "192.168.1.100",
-		})
+			IPAddress: "192.168.1.100",
+		}
+
+		_, err := service.SignUp(ctx, req, sessionMeta)
 		require.NoError(t, err)
 
-		_, err = service.SignUp(ctx, req, internal.SessionMetadata{
-			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-			IPAddress:        "192.168.1.100",
-		})
+		_, err = service.SignUp(ctx, req, sessionMeta)
 		require.Error(t, err)
 		assert.Equal(t, "Email already registered", err.Error())
 	})
 
 	t.Run("password is hashed", func(t *testing.T) {
-		jwtManager.On("GenerateToken", mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
+		jwtManager.On("GenerateToken", mock.AnythingOfType("int64"), mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
 		
 		req := internal.SignUpRequest{
 			Email:    "hash@example.com",
 			Password: "mypassword",
 		}
 
-		resp, err := service.SignUp(ctx, req, internal.SessionMetadata{
+		sessionMeta := internal.SessionMetadata{
 			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-			IPAddress:        "192.168.1.100",
-		})
+			IPAddress: "192.168.1.100",
+		}
+
+		resp, err := service.SignUp(ctx, req, sessionMeta)
 		require.NoError(t, err)
 
 		// Verify password is not stored in plain text
@@ -162,15 +201,21 @@ func TestSignIn(t *testing.T) {
 	pool, cleanup := setUpTestDb(t)
 	defer cleanup()
 
+	nc, natsCleanup := setUpNats(t)
+	defer natsCleanup()
+
+	log := logger.NewTestLogger()
+
 	repo := internal.NewAuthRepository(pool)
 	jwtManager := new(MockJWTManager)
 	cfg := &config.Config{}
-	service := internal.NewAuthService(repo, jwtManager, cfg)
+	service := internal.NewAuthService(repo, jwtManager, cfg, nc, log)
 	ctx := context.Background()
 
-	// Common test data
-	email := "signin@mail.com"
-	password := "Password1234!"
+	signUpReq := internal.SignUpRequest{
+		Email: "test@mail.com",
+		Password: "Password1234!",
+	}
 	
 	jwtManager.On("GenerateToken", mock.AnythingOfType("int64"), mock.AnythingOfType("int64")).Return("mock-jwt-token", nil)
 	
@@ -179,27 +224,25 @@ func TestSignIn(t *testing.T) {
 		IPAddress: "192.168.1.100",
 	}
 
-	// Setup: Create test user once
-	_, err := service.SignUp(ctx, internal.SignUpRequest{
-		Email:    email,
-		Password: password,
-	}, sessionMeta)
+	_, err := service.SignUp(ctx, signUpReq, sessionMeta)
 	require.NoError(t, err)
 
+	signInReq := internal.SignInRequest{
+		Email: "test@mail.com",
+		Password: "Password1234!",
+	}
+
 	t.Run("successful sign in", func(t *testing.T) {
-		resp, err := service.SignIn(ctx, internal.SignInRequest{
-			Email:    email,
-			Password: password,
-		}, sessionMeta)
+		resp, err := service.SignIn(ctx, signInReq, sessionMeta)
 
 		require.NoError(t, err)
 		assert.Equal(t, "mock-jwt-token", resp.AccessToken)
-		assert.Equal(t, email, resp.Account.Email)
+		assert.Equal(t, signInReq.Email, resp.Account.Email)
 	})
 
 	t.Run("invalid password fails", func(t *testing.T) {
 		_, err := service.SignIn(ctx, internal.SignInRequest{
-			Email:    email,
+			Email:    signInReq.Email,
 			Password: "WrongPassword!",
 		}, sessionMeta)
 

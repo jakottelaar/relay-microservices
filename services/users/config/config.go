@@ -3,33 +3,36 @@ package config
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-    Env                string
-    Port               string
-    DB                 DBConfig
-    JWTSecret          string
-    AccessTokenExpiry  time.Duration
-    RefreshTokenExpiry time.Duration
-    MaxSessionsPerUser int
-    JWTIssuer          string
-	NatsURL            string
+	Env  string
+	Port string
+	DB   DBConfig
+	Storage StorageConfig
+	NatsURL string
 }
 
 type DBConfig struct {
-	DatabaseUrl string
-	MaxConns    int32
-	MinConns    int32
+	DatabaseUrl     string
+	MaxConns        int32
+	MinConns        int32
 	MaxConnLifetime int
 	MaxConnIdleTime int
 }
 
-func LoadConfig() (*Config, error) {
+type StorageConfig struct {
+    Endpoint         string
+    AccessKeyID      string
+    SecretAccessKey  string
+    UseSSL           bool
+    Bucket           string
+    DefaultAvatarURL string
+}
 
+func LoadConfig() (*Config, error) {
 	env := getEnv("ENVIRONMENT", "development")
 
 	if env == "development" {
@@ -49,34 +52,31 @@ func LoadConfig() (*Config, error) {
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
 
-	JWTSecret := getEnv("JWT_SECRET", "")
-	if JWTSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET environment variable is required")
+	storageConfig := StorageConfig{
+		Endpoint:         getEnv("S3_ENDPOINT", "seaweedfs-s3:8333"),
+		AccessKeyID:      getEnv("S3_ACCESS_KEY_ID", "any"),
+		SecretAccessKey:  getEnv("S3_SECRET_ACCESS_KEY", "any"),
+		UseSSL:           getEnvBool("S3_USE_SSL", false),
+		Bucket:           getEnv("S3_BUCKET", "relay-avatars"),
+		DefaultAvatarURL: getEnv("S3_DEFAULT_AVATAR_URL", ""),
 	}
-	accessTokenExpiry := time.Duration(getEnvInt("ACCESS_TOKEN_EXPIRY", 900)) * time.Second
-	refreshTokenExpiry := time.Duration(getEnvInt("REFRESH_TOKEN_EXPIRY", 168)) * time.Hour
-	maxSessionsPerUser := getEnvInt("MAX_SESSIONS_PER_USER", 5)
-	jwtIssuer := getEnv("JWT_ISSUER", "relay-auth")
+
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
 
+
 	return &Config{
-		Env: env,
+		Env:  env,
 		Port: port,
 		DB: DBConfig{
-			DatabaseUrl: databaseUrl,
-			MaxConns:    int32(maxConns),
-			MinConns:    int32(minConns),
+			DatabaseUrl:     databaseUrl,
+			MaxConns:        int32(maxConns),
+			MinConns:        int32(minConns),
 			MaxConnLifetime: maxConnLifetime,
 			MaxConnIdleTime: maxConnIdleTime,
 		},
-		JWTSecret: JWTSecret,
-		AccessTokenExpiry: accessTokenExpiry,
-		RefreshTokenExpiry: refreshTokenExpiry,
-		MaxSessionsPerUser: maxSessionsPerUser,
-		JWTIssuer: jwtIssuer,
+		Storage: storageConfig,
 		NatsURL: natsURL,
 	}, nil
-
 }
 
 func getEnv(key, fallback string) string {
@@ -93,6 +93,13 @@ func getEnvInt(key string, fallback int) int {
 		if err == nil {
 			return intValue
 		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if value := os.Getenv(key); value != "" {
+		return value == "true"
 	}
 	return fallback
 }

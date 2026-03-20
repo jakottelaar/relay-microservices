@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:18
-    container_name: relay-postgres
+    container_name: test-relay-postgres
     env_file:
       - .env
     ports:
@@ -19,7 +19,7 @@ services:
 
   traefik:
     image: traefik:latest
-    container_name: relay-traefik
+    container_name: test-relay-traefik
     ports:
       - "80:80"
       - "8080:8080"
@@ -32,7 +32,7 @@ services:
 
   nats:
     image: nats:latest
-    container_name: relay-nats
+    container_name: test-relay-nats
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -41,11 +41,11 @@ services:
 
   auth:
     build:
-      context: ..
+      context: ../..
       dockerfile: services/auth/Dockerfile
     env_file:
       - .env
-    container_name: relay-auth
+    container_name: test-relay-auth
     environment:
       - PORT=8080
       - DATABASE_URL=${AUTH_DATABASE_URL}
@@ -57,11 +57,11 @@ services:
 
   users:
     build:
-      context: ..
+      context: ../..
       dockerfile: services/users/Dockerfile
     env_file:
       - .env
-    container_name: relay-users
+    container_name: test-relay-users
     environment:
       - PORT=8081
       - DATABASE_URL=${USERS_DATABASE_URL}
@@ -73,7 +73,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: relay-minio
+    container_name: test-relay-minio
     ports:
       - "9000:9000"
       - "9001:9001"

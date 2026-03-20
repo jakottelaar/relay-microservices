@@ -8,12 +8,12 @@ RUN apk add --no-cache git
 COPY shared/ ./shared/
 
 # Copy service module files
-COPY services/auth/ ./services/auth/
+COPY services/users/ ./services/users/
 
 # Copy migrations
-COPY services/auth/migrations/ ./migrations/
+COPY services/users/migrations/ ./migrations/
 
-WORKDIR /app/services/auth
+WORKDIR /app/services/users
 
 # Disable workspace, use the replace directive in go.mod instead
 RUN GOWORK=off go mod download

@@ -3,6 +3,7 @@ package internal
 type SignUpRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
+	Username string `json:"username" binding:"required,min=3,max=32"`
 }
 
 type SignInRequest struct {
@@ -17,7 +18,7 @@ type RefreshTokenRequest struct {
 type AuthResponse struct {
 	AccessToken  string   `json:"access_token"`
 	RefreshToken string   `json:"refresh_token"`
-	ExpiresIn    int      `json:"expires_in"` // Expiration time in seconds
+	ExpiresIn    int      `json:"expires_in"`
 	Account      *Account `json:"account"`
 }
 

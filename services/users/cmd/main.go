@@ -15,8 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/jakottelaar/relay-microservices/services/auth/config"
-	"github.com/jakottelaar/relay-microservices/services/auth/internal"
+	"github.com/jakottelaar/relay-microservices/services/users/config"
+	"github.com/jakottelaar/relay-microservices/services/users/internal"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
@@ -37,8 +37,7 @@ func main() {
 	}
 	defer log.Sync()
 
-
-	log.Info("Starting auth service",
+	log.Info("Starting users service",
 		zap.String("env", cfg.Env),
 		zap.String("port", cfg.Port),
 	)
@@ -54,6 +53,7 @@ func main() {
 	}
 	defer pool.Close()
 
+	
 	if err := internal.RunMigrations(cfg.DB.DatabaseUrl); err != nil {
 		log.Fatal("Failed to run database migrations",
 			zap.Error(err),
@@ -68,6 +68,13 @@ func main() {
 	}
 	defer nc.Close()
 
+	storage, err := internal.NewStorageClient(cfg)
+	if err != nil {
+		log.Fatal("Failed to initialize MinIO client",
+			zap.Error(err),
+		)
+	}
+	
 	if err := sonyflake.InitSonyFlake(); err != nil {
 		log.Fatal("Failed to initialize Sonyflake",
 			zap.Error(err),
@@ -75,7 +82,7 @@ func main() {
 	}
 
 	r := gin.Default()
-
+	
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
@@ -87,39 +94,25 @@ func main() {
 	}
 
 	r.Use(errors.ErrorHandler())
-	
+
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
 	})
+
+	repo := internal.NewUserRepository(pool)
+	service := internal.NewUserService(repo, log, storage, cfg)
+	handler := internal.NewUserHandler(service)
 	
-
-	repo := internal.NewAuthRepository(pool)
-	jwtManager, err := internal.NewJWTManager(cfg, repo)
-	if err != nil {
-		log.Fatal("Failed to create JWT manager",
-			zap.Error(err),
-		)
-	}
-	service := internal.NewAuthService(repo, jwtManager, cfg, nc, log)
-    handler := internal.NewAuthHandler(service, log)
-
-	authGroup := r.Group("/auth")
-	authGroup.POST("/sign-up", handler.SignUp)
-	authGroup.POST("/sign-in", handler.SignIn)
-	authGroup.POST("/refresh", handler.Refresh)
-	authGroup.POST("/sign-out", handler.SignOut)
-
-	r.GET("/auth/validate", internal.ValidateMiddleware(jwtManager))
-
-	protected := r.Group("/auth")
-    protected.Use(internal.RequireAuth(jwtManager))
-    {
-        protected.DELETE("/sessions", handler.RevokeAllSessions)
-		protected.DELETE("/sessions/:id", handler.RevokeSessionById)
-		protected.GET("/sessions/:id", handler.GetSessionById)
+	group := r.Group("/users")
+	group.GET("/:id/profile", handler.GetUserProfile)
+	
+	eventHandler := internal.NewEventHandler(service, nc, log)
+    if err := eventHandler.SubscribeToEvents(ctx); err != nil {
+        log.Fatal("Failed to subscribe to events", zap.Error(err))
     }
+
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
@@ -128,7 +121,7 @@ func main() {
 
 	go func() {
 		log.Info(
-			fmt.Sprintf("Auth service is running on port %s", cfg.Port),
+			fmt.Sprintf("Users service is running on port %s", cfg.Port),
 			zap.String("port", cfg.Port),
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -156,4 +149,5 @@ func main() {
 	}
 
 	log.Info("Server exited")
+
 }

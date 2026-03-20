@@ -1,20 +1,58 @@
-package internal
+package errors
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 type ServiceError struct {
 	Code    int
 	Message string
+	Fields  map[string]string 
 	Err     error
 }
 
 func (e *ServiceError) Error() string {
 	return e.Message
+}
+
+func NewValidationError(err error) *ServiceError {
+    var ve validator.ValidationErrors
+    if errors.As(err, &ve) {
+        fields := make(map[string]string, len(ve))
+        for _, fe := range ve {
+            fields[fe.Field()] = validationMessage(fe)
+        }
+
+        return &ServiceError{
+            Code:    http.StatusBadRequest,
+            Message: "Validation failed",
+            Fields:  fields,
+        }
+    }
+    return &ServiceError{
+        Code:    http.StatusBadRequest,
+        Message: err.Error(),
+    }
+}
+
+func validationMessage(fe validator.FieldError) string {
+    switch fe.Tag() {
+    case "required":
+        return "This field is required"
+    case "email":
+        return "Must be a valid email address"
+    case "min":
+        return fmt.Sprintf("Must be at least %s characters", fe.Param())
+    case "max":
+        return fmt.Sprintf("Must be at most %s characters", fe.Param())
+    default:
+        return fmt.Sprintf("Failed validation on '%s'", fe.Tag())
+    }
 }
 
 func NewBadRequestError(msg string) error {
@@ -75,6 +113,13 @@ func ErrorHandler() gin.HandlerFunc {
 			for _, e := range c.Errors {
 				// Check if it's a ServiceError
 				if serviceErr, ok := e.Err.(*ServiceError); ok {
+					if serviceErr.Fields != nil {
+						c.JSON(serviceErr.Code, gin.H{
+							"error":  serviceErr.Message,
+							"fields": serviceErr.Fields,
+						})
+						return
+					}
 					c.JSON(serviceErr.Code, gin.H{
 						"error": serviceErr.Message,
 					})
