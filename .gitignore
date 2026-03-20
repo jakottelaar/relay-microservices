@@ -25,3 +25,9 @@ go.work.sum
 .env*
 
 keys
+
+.vscode
+
+# python
+__pycache__/
+*.pyc

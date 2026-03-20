@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jakottelaar/relay-microservices/services/auth/config"
 )
@@ -32,4 +35,18 @@ func NewPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
+}
+
+func RunMigrations(databaseURL string) error {
+    m, err := migrate.New(
+        "file://migrations",
+        databaseURL,
+    )
+    if err != nil {
+        return err
+    }
+    if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+        return err
+    }
+    return nil
 }

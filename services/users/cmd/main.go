@@ -49,6 +49,13 @@ func main() {
 	}
 	defer pool.Close()
 
+	
+	if err := internal.RunMigrations(cfg.DB.DatabaseUrl); err != nil {
+		log.Fatal("Failed to run database migrations",
+			zap.Error(err),
+		)
+	}
+
 	nc, err := nats.Connect(cfg.NatsURL)
 	if err != nil {
 		log.Fatal("Failed to connect to NATS",
