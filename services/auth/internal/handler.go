@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"go.uber.org/zap"
 )
 
@@ -22,12 +23,11 @@ func NewAuthHandler(service AuthService, log *zap.Logger) *AuthHandler {
 
 func (h *AuthHandler) SignUp(c *gin.Context) {
     var req SignUpRequest
-    if err := c.BindJSON(&req); err != nil {
-        h.log.Warn("Invalid request body",
-            zap.Error(err),
+    if err := c.ShouldBindJSON(&req); err != nil {
+        h.log.Warn("Invalid request body", zap.Error(err),
             zap.String("path", c.Request.URL.Path),
         )
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        c.Error(errors.NewValidationError(err))
         return
     }
 
@@ -62,7 +62,7 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
             zap.Error(err),
             zap.String("path", c.Request.URL.Path),
         )
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        c.Error(errors.NewValidationError(err))
         return
     }
 
@@ -82,7 +82,11 @@ func (h *AuthHandler) SignIn(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
     var req RefreshTokenRequest
     if err := c.BindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        h.log.Warn("Invalid request body",
+            zap.Error(err),
+            zap.String("path", c.Request.URL.Path),
+        )
+        c.Error(errors.NewValidationError(err))
         return
     }
 
@@ -99,7 +103,11 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) SignOut(c *gin.Context) {
     var req RefreshTokenRequest
     if err := c.BindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        h.log.Warn("Invalid request body",
+            zap.Error(err),
+            zap.String("path", c.Request.URL.Path),
+        )
+        c.Error(errors.NewValidationError(err))
         return
     }
 
@@ -116,7 +124,7 @@ func (h *AuthHandler) GetSessionById(c *gin.Context) {
     sessionId := c.Param("id")
     id, err := strconv.ParseInt(sessionId, 10, 64)
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session ID"})
+        c.Error(err)
         return
     }
 
@@ -132,7 +140,7 @@ func (h *AuthHandler) GetSessionById(c *gin.Context) {
 func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
     userID, exists := c.Get("user_id")
     if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "user ID not found in context"})
+        c.Error(errors.NewUnauthorizedError("user ID not found in context"))
         return
     }
 
@@ -149,7 +157,7 @@ func (h *AuthHandler) RevokeSessionById(c *gin.Context) {
     sessionId := c.Param("id")
     id, err := strconv.ParseInt(sessionId, 10, 64)
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session ID"})
+        c.Error(err)
         return
     }
 
