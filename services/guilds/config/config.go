@@ -10,7 +10,17 @@ import (
 type Config struct {
 	Env  string
 	Port string
+	DB   DBConfig
 }
+
+type DBConfig struct {
+	DatabaseUrl     string
+	MaxConns        int32
+	MinConns        int32
+	MaxConnLifetime int
+	MaxConnIdleTime int
+}
+
 
 func LoadConfig() (*Config, error) {
 	env := getEnv("ENVIRONMENT", "development")
@@ -23,9 +33,25 @@ func LoadConfig() (*Config, error) {
 	}
 
 	port := getEnv("PORT", "8080")
+	databaseUrl := getEnv("DATABASE_URL", "")
+	if databaseUrl == "" {
+		return nil, fmt.Errorf("DATABASE_URL environment variable is required")
+	}
+	maxConns := getEnvInt("DB_MAX_CONNS", 10)
+	minConns := getEnvInt("DB_MIN_CONNS", 2)
+	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
+	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
+
 	return &Config{
 		Env:  env,
 		Port: port,
+		DB: DBConfig{
+			DatabaseUrl:     databaseUrl,
+			MaxConns:        int32(maxConns),
+			MinConns:        int32(minConns),
+			MaxConnLifetime: maxConnLifetime,
+			MaxConnIdleTime: maxConnIdleTime,
+		},
 	}, nil
 }
 

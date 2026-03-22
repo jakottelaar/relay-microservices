@@ -7,12 +7,19 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	"github.com/jakottelaar/relay-microservices/services/guilds/config"
+	"github.com/jakottelaar/relay-microservices/services/guilds/internal"
+	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
+	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"go.uber.org/zap"
 )
 
@@ -29,18 +36,61 @@ func main() {
 	}
 	defer log.Sync()
 
-	log.Info("Starting users service",
+	log.Info("Starting guilds service",
 		zap.String("env", cfg.Env),
 		zap.String("port", cfg.Port),
 	)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pool, err := internal.NewPool(ctx, cfg)
+	if err != nil {
+		log.Fatal("Failed to create database pool",
+			zap.Error(err),
+		)
+	}
+	defer pool.Close()
+
+	if err := internal.RunMigrations(cfg.DB.DatabaseUrl); err != nil {
+		log.Fatal("Failed to run database migrations",
+			zap.Error(err),
+		)
+	}
+
+	if err := sonyflake.InitSonyFlake(); err != nil {
+		log.Fatal("Failed to initialize Sonyflake",
+			zap.Error(err),
+		)
+	}
+
 	r := gin.Default()
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+			if name == "-" {
+				return ""
+			}
+			return name
+		})
+	}
+
+	r.Use(errors.ErrorHandler())
+	r.Use(internal.UserContext())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
 	})
+
+	repo := internal.NewGuildRepository(pool)
+	service := internal.NewGuildService(repo, log)
+	handler := internal.NewGuildHandler(service, log)
+
+	guildsGroup := r.Group("/guilds")
+	guildsGroup.POST("", handler.CreateGuild)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

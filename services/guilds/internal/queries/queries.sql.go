@@ -23,7 +23,7 @@ VALUES (
     $1,
     $2,
     $3,
-    COALESCE($4, NULL),
+    $4,
     $5
 )
 RETURNING id, name, description, icon, owner_id, created_at, updated_at
@@ -33,7 +33,7 @@ type CreateGuildParams struct {
 	ID          int64       `json:"id"`
 	Name        string      `json:"name"`
 	Description pgtype.Text `json:"description"`
-	Column4     interface{} `json:"column_4"`
+	Icon        pgtype.Text `json:"icon"`
 	OwnerID     int64       `json:"owner_id"`
 }
 
@@ -42,7 +42,7 @@ func (q *Queries) CreateGuild(ctx context.Context, arg CreateGuildParams) (Guild
 		arg.ID,
 		arg.Name,
 		arg.Description,
-		arg.Column4,
+		arg.Icon,
 		arg.OwnerID,
 	)
 	var i Guild

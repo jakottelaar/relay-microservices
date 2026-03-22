@@ -10,7 +10,7 @@ VALUES (
     $1,
     $2,
     $3,
-    COALESCE($4, NULL),
+    $4,
     $5
 )
 RETURNING *;
