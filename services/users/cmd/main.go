@@ -68,11 +68,15 @@ func main() {
 	}
 	defer nc.Close()
 
-	storage, err := internal.NewStorageClient(cfg)
+	minioClient, err := internal.NewStorageClient(cfg)
 	if err != nil {
-		log.Fatal("Failed to initialize MinIO client",
-			zap.Error(err),
-		)
+		log.Fatal("Failed to initialize MinIO client", zap.Error(err))
+	}
+
+	userStorage := internal.NewUserStorage(minioClient, cfg.Storage.BucketName, cfg.Storage.BaseURL)
+
+	if err := userStorage.EnsureBucket(context.Background()); err != nil {
+		log.Fatal("Failed to ensure bucket exists", zap.Error(err))
 	}
 	
 	if err := sonyflake.InitSonyFlake(); err != nil {
@@ -102,7 +106,7 @@ func main() {
 	})
 
 	repo := internal.NewUserRepository(pool)
-	service := internal.NewUserService(repo, log, storage, cfg)
+	service := internal.NewUserService(repo, userStorage, log)
 	handler := internal.NewUserHandler(service)
 	
 	group := r.Group("/users")

@@ -25,7 +25,11 @@ type guildService struct {
 }
 
 func NewGuildService(repo *GuildRepository, storage *GuildStorage, log *zap.Logger) *guildService {
-    return &guildService{repo: repo, storage: storage, log: log}
+    return &guildService{
+        repo: repo, 
+        storage: storage, 
+        log: log,
+    }
 }
 
 func (s *guildService) CreateGuild(ctx context.Context, ownerID int64, req *CreateGuildRequest, icon *multipart.FileHeader) (*GuildResponse, error) {

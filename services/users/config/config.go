@@ -24,11 +24,12 @@ type DBConfig struct {
 }
 
 type StorageConfig struct {
-    Endpoint         string
-    AccessKeyID      string
-    SecretAccessKey  string
-    UseSSL           bool
-    Bucket           string
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
+	UseSSL          bool
+	BucketName      string
+	BaseURL         string
     DefaultAvatarURL string
 }
 
@@ -52,14 +53,13 @@ func LoadConfig() (*Config, error) {
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
 
-	storageConfig := StorageConfig{
-		Endpoint:         getEnv("S3_ENDPOINT", "seaweedfs-s3:8333"),
-		AccessKeyID:      getEnv("S3_ACCESS_KEY_ID", "any"),
-		SecretAccessKey:  getEnv("S3_SECRET_ACCESS_KEY", "any"),
-		UseSSL:           getEnvBool("S3_USE_SSL", false),
-		Bucket:           getEnv("S3_BUCKET", "relay-avatars"),
-		DefaultAvatarURL: getEnv("S3_DEFAULT_AVATAR_URL", ""),
-	}
+	minioEndpoint := getEnv("MINIO_ENDPOINT", "localhost:9000")
+	minioAccessKeyID := getEnv("MINIO_ACCESS_KEY", "minio")
+	minioSecretAccessKey := getEnv("MINIO_SECRET_ACCESS_KEY", "minio123")
+	minioUseSSL := getEnvBool("MINIO_USE_SSL", false)
+	bucketName := getEnv("MINIO_BUCKET_NAME", "guild-icons")
+	baseURL := getEnv("MINIO_BASE_URL", "http://localhost:9000")
+	defaultAvatarURL := getEnv("DEFAULT_AVATAR_URL", "http://localhost:9000/default-avatar.png")
 
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
 
@@ -74,7 +74,15 @@ func LoadConfig() (*Config, error) {
 			MaxConnLifetime: maxConnLifetime,
 			MaxConnIdleTime: maxConnIdleTime,
 		},
-		Storage: storageConfig,
+		Storage: StorageConfig{
+			Endpoint:        minioEndpoint,
+			AccessKeyID:     minioAccessKeyID,
+			SecretAccessKey: minioSecretAccessKey,
+			UseSSL:          minioUseSSL,
+			BucketName:      bucketName,
+			BaseURL:           baseURL,
+			DefaultAvatarURL: defaultAvatarURL,
+		},
 		NatsURL: natsURL,
 	}, nil
 }
