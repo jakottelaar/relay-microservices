@@ -11,6 +11,7 @@ type Config struct {
 	Env  string
 	Port string
 	DB   DBConfig
+	Storage StorageConfig
 }
 
 type DBConfig struct {
@@ -21,6 +22,14 @@ type DBConfig struct {
 	MaxConnIdleTime int
 }
 
+type StorageConfig struct {
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
+	UseSSL          bool
+	BucketName      string
+	BaseURL         string
+}
 
 func LoadConfig() (*Config, error) {
 	env := getEnv("ENVIRONMENT", "development")
@@ -42,6 +51,13 @@ func LoadConfig() (*Config, error) {
 	maxConnLifetime := getEnvInt("DB_MAX_CONN_LIFETIME", 3600)
 	maxConnIdleTime := getEnvInt("DB_MAX_CONN_IDLE_TIME", 1800)
 
+	minioEndpoint := getEnv("MINIO_ENDPOINT", "localhost:9000")
+	minioAccessKeyID := getEnv("MINIO_ACCESS_KEY", "minio")
+	minioSecretAccessKey := getEnv("MINIO_SECRET_ACCESS_KEY", "minio123")
+	minioUseSSL := getEnvBool("MINIO_USE_SSL", false)
+	bucketName := getEnv("MINIO_BUCKET_NAME", "guild-icons")
+	baseURL := getEnv("MINIO_BASE_URL", "http://localhost:9000")
+
 	return &Config{
 		Env:  env,
 		Port: port,
@@ -51,6 +67,14 @@ func LoadConfig() (*Config, error) {
 			MinConns:        int32(minConns),
 			MaxConnLifetime: maxConnLifetime,
 			MaxConnIdleTime: maxConnIdleTime,
+		},
+		Storage: StorageConfig{
+			Endpoint:        minioEndpoint,
+			AccessKeyID:     minioAccessKeyID,
+			SecretAccessKey: minioSecretAccessKey,
+			UseSSL:          minioUseSSL,
+			BucketName:      bucketName,
+			BaseURL:         baseURL,
 		},
 	}, nil
 }

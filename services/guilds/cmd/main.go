@@ -58,6 +58,17 @@ func main() {
 		)
 	}
 
+	minioClient, err := internal.NewStorageClient(cfg)
+	if err != nil {
+		log.Fatal("Failed to initialize MinIO client", zap.Error(err))
+	}
+
+	guildStorage := internal.NewGuildStorage(minioClient, cfg.Storage.BucketName, cfg.Storage.BaseURL)
+
+	if err := guildStorage.EnsureBucket(context.Background()); err != nil {
+		log.Fatal("Failed to ensure bucket exists", zap.Error(err))
+	}
+
 	if err := sonyflake.InitSonyFlake(); err != nil {
 		log.Fatal("Failed to initialize Sonyflake",
 			zap.Error(err),
@@ -86,7 +97,7 @@ func main() {
 	})
 
 	repo := internal.NewGuildRepository(pool)
-	service := internal.NewGuildService(repo, log)
+	service := internal.NewGuildService(repo, guildStorage, log)
 	handler := internal.NewGuildHandler(service, log)
 
 	guildsGroup := r.Group("/guilds")
