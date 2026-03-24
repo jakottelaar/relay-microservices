@@ -22,4 +22,12 @@ go.work
 go.work.sum
 
 # env file
-.env
+.env*
+
+keys
+
+.vscode
+
+# python
+__pycache__/
+*.pyc

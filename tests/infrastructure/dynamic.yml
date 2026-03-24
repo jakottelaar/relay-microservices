@@ -1,0 +1,53 @@
+http:
+  routers:
+    auth-router:
+      rule: "PathPrefix(`/api/auth`)"
+      service: auth-service
+      entryPoints:
+        - web
+      middlewares:
+        - strip-api
+    users-router:
+      rule: "PathPrefix(`/api/users`)"
+      service: users-service
+      entryPoints:
+        - web
+      middlewares:
+        - strip-api
+        - forwardauth-middleware
+    guilds-router:
+      rule: "PathPrefix(`/api/guilds`)"
+      service: guilds-service
+      entryPoints:
+        - web
+      middlewares:
+        - strip-api
+        - forwardauth-middleware
+
+  middlewares:
+    strip-api:
+      stripPrefix:
+        prefixes:
+          - "/api"
+    forwardauth-middleware:
+      forwardAuth:
+        address: "http://auth:8080/auth/validate"
+        authRequestHeaders:
+          - "Authorization"
+          - "Cookie"
+        authResponseHeaders:
+          - "X-User-ID"
+          - "X-Session-ID"
+  services:
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth:8080"
+    users-service:
+      loadBalancer:
+        servers:
+          - url: "http://users:8081"
+    guilds-service:
+      loadBalancer:
+        servers:
+          - url: "http://guilds:8082"

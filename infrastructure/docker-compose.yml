@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: relay-postgres
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - relay-network
+
+  traefik:
+    image: traefik:latest
+    container_name: relay-traefik
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - relay-network
+
+  nats:
+    image: nats:latest
+    container_name: relay-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - relay-network
+
+  auth:
+    build:
+      context: ..
+      dockerfile: services/auth/Dockerfile
+    env_file:
+      - .env
+    container_name: relay-auth
+    environment:
+      - PORT=8080
+      - DATABASE_URL=${AUTH_DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - relay-network
+
+  users:
+    build:
+      context: ..
+      dockerfile: services/users/Dockerfile
+    env_file:
+      - .env
+    container_name: relay-users
+    environment:
+      - PORT=8081
+      - DATABASE_URL=${USERS_DATABASE_URL}
+      - MINIO_BUCKET_NAME=${USERS_MINIO_BUCKET_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - relay-network
+
+  guilds:
+    build:
+      context: ..
+      dockerfile: services/guilds/Dockerfile
+    env_file:
+      - .env
+    container_name: relay-guilds
+    environment:
+      - PORT=8082
+      - DATABASE_URL=${GUILDS_DATABASE_URL}
+      - MINIO_BUCKET_NAME=${GUILDS_MINIO_BUCKET_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - relay-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: relay-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - .env
+    command: server /data --console-address ":9001"
+    networks:
+      - relay-network
+
+volumes:
+  postgres_data:
+
+networks:
+  relay-network:
+    driver: bridge
