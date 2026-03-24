@@ -3,6 +3,7 @@ package internal
 import (
 	"mime/multipart"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
@@ -58,4 +59,39 @@ func (h *GuildHandler) CreateGuild(c *gin.Context) {
     )
 
     c.JSON(http.StatusCreated, guildResp)
+}
+
+func (h *GuildHandler) GetGuild(c *gin.Context) {
+    guildIDStr := c.Param("id")
+
+    guildID, err := strconv.ParseInt(guildIDStr, 10, 64)
+    if err != nil {
+        h.log.Warn("Invalid guild id",
+            zap.String("guild_id", guildIDStr),
+            zap.Error(err),
+        )
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+        return
+    }
+
+    h.log.Info("Get guild attempt",
+        zap.Int64("guild_id", guildID),
+    )
+
+    guildResp, err := h.service.GetGuild(c.Request.Context(), guildID)
+    if err != nil {
+        h.log.Error("Failed to get guild",
+            zap.Int64("guild_id", guildID),
+            zap.Error(err),
+        )
+        _ = c.Error(err)
+        return
+    }
+
+    h.log.Info("Guild retrieved successfully",
+        zap.String("guild_id", guildResp.ID),
+        zap.String("guild_name", guildResp.Name),
+    )
+
+    c.JSON(http.StatusOK, guildResp)
 }

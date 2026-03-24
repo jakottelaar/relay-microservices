@@ -16,6 +16,7 @@ import (
 
 type GuildService interface {
     CreateGuild(ctx context.Context, ownerID int64, req *CreateGuildRequest, icon *multipart.FileHeader) (*GuildResponse, error)
+    GetGuild(ctx context.Context, guildID int64) (*GuildResponse, error)
 }
 
 type guildService struct {
@@ -67,9 +68,27 @@ func (s *guildService) CreateGuild(ctx context.Context, ownerID int64, req *Crea
         ID:          strconv.FormatInt(guildID, 10),
         Name:        guild.Name,
         Description: guild.Description.String,
-        CreatedAt:   guild.CreatedAt.Time.Format(time.RFC3339),
         Icon:        s.buildIconURL(guild.Icon),
         OwnerID:     strconv.FormatInt(ownerID, 10),
+        CreatedAt:   guild.CreatedAt.Time.Format(time.RFC3339),
+    }, nil
+}
+
+func (s *guildService) GetGuild(ctx context.Context, guildID int64) (*GuildResponse, error) {
+    guild, err := s.repo.GetGuild(ctx, guildID)
+    if err != nil {
+        s.log.Error("Failed to get guild from repository", zap.Error(err))
+        return nil, errors.NewInternalServerError("Failed to get guild")
+    }
+
+    return &GuildResponse{
+        ID:          strconv.FormatInt(guild.ID, 10),
+        Name:        guild.Name,
+        Description: guild.Description.String,
+        Icon:        s.buildIconURL(guild.Icon),
+        OwnerID:     strconv.FormatInt(guild.OwnerID, 10),
+        CreatedAt:   guild.CreatedAt.Time.Format(time.RFC3339),
+        UpdatedAt:   guild.UpdatedAt.Time.Format(time.RFC3339),
     }, nil
 }
 

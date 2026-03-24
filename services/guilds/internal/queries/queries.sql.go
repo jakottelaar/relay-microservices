@@ -57,3 +57,31 @@ func (q *Queries) CreateGuild(ctx context.Context, arg CreateGuildParams) (Guild
 	)
 	return i, err
 }
+
+const getGuild = `-- name: GetGuild :one
+SELECT
+    id,
+    name,
+    description,
+    icon,
+    owner_id,
+    created_at,
+    updated_at
+FROM guilds
+WHERE id = $1
+`
+
+func (q *Queries) GetGuild(ctx context.Context, id int64) (Guild, error) {
+	row := q.db.QueryRow(ctx, getGuild, id)
+	var i Guild
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.Icon,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
