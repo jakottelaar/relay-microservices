@@ -65,6 +65,24 @@ services:
     environment:
       - PORT=8081
       - DATABASE_URL=${USERS_DATABASE_URL}
+      - MINIO_BUCKET_NAME=${USERS_MINIO_BUCKET_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - relay-network
+
+  guilds:
+    build:
+      context: ..
+      dockerfile: services/guilds/Dockerfile
+    env_file:
+      - .env
+    container_name: relay-guilds
+    environment:
+      - PORT=8082
+      - DATABASE_URL=${GUILDS_DATABASE_URL}
+      - MINIO_BUCKET_NAME=${GUILDS_MINIO_BUCKET_NAME}
     depends_on:
       postgres:
         condition: service_healthy

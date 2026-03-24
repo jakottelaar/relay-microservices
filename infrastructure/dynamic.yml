@@ -15,6 +15,15 @@ http:
       middlewares:
         - strip-api
         - forwardauth-middleware
+    guilds-router:
+      rule: "PathPrefix(`/api/guilds`)"
+      service: guilds-service
+      entryPoints:
+        - web
+      middlewares:
+        - strip-api
+        - forwardauth-middleware
+
   middlewares:
     strip-api:
       stripPrefix:
@@ -38,3 +47,7 @@ http:
       loadBalancer:
         servers:
           - url: "http://users:8081"
+    guilds-service:
+      loadBalancer:
+        servers:
+          - url: "http://guilds:8082"

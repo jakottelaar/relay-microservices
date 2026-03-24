@@ -12,7 +12,6 @@ type Config struct {
 	Port string
 	DB   DBConfig
 	Storage StorageConfig
-	NatsURL string
 }
 
 type DBConfig struct {
@@ -30,7 +29,6 @@ type StorageConfig struct {
 	UseSSL          bool
 	BucketName      string
 	BaseURL         string
-    DefaultAvatarURL string
 }
 
 func LoadConfig() (*Config, error) {
@@ -59,10 +57,6 @@ func LoadConfig() (*Config, error) {
 	minioUseSSL := getEnvBool("MINIO_USE_SSL", false)
 	bucketName := getEnv("MINIO_BUCKET_NAME", "guild-icons")
 	baseURL := getEnv("MINIO_BASE_URL", "http://localhost:9000")
-	defaultAvatarURL := getEnv("DEFAULT_AVATAR_URL", "http://localhost:9000/default-avatar.png")
-
-	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
-
 
 	return &Config{
 		Env:  env,
@@ -80,10 +74,8 @@ func LoadConfig() (*Config, error) {
 			SecretAccessKey: minioSecretAccessKey,
 			UseSSL:          minioUseSSL,
 			BucketName:      bucketName,
-			BaseURL:           baseURL,
-			DefaultAvatarURL: defaultAvatarURL,
+			BaseURL:         baseURL,
 		},
-		NatsURL: natsURL,
 	}, nil
 }
 

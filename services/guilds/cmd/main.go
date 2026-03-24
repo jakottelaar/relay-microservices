@@ -15,12 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/jakottelaar/relay-microservices/services/users/config"
-	"github.com/jakottelaar/relay-microservices/services/users/internal"
+	"github.com/jakottelaar/relay-microservices/services/guilds/config"
+	"github.com/jakottelaar/relay-microservices/services/guilds/internal"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
-	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
@@ -37,7 +36,7 @@ func main() {
 	}
 	defer log.Sync()
 
-	log.Info("Starting users service",
+	log.Info("Starting guilds service",
 		zap.String("env", cfg.Env),
 		zap.String("port", cfg.Port),
 	)
@@ -53,32 +52,23 @@ func main() {
 	}
 	defer pool.Close()
 
-	
 	if err := internal.RunMigrations(cfg.DB.DatabaseUrl); err != nil {
 		log.Fatal("Failed to run database migrations",
 			zap.Error(err),
 		)
 	}
 
-	nc, err := nats.Connect(cfg.NatsURL)
-	if err != nil {
-		log.Fatal("Failed to connect to NATS",
-			zap.Error(err),
-		)
-	}
-	defer nc.Close()
-
 	minioClient, err := internal.NewStorageClient(cfg)
 	if err != nil {
 		log.Fatal("Failed to initialize MinIO client", zap.Error(err))
 	}
 
-	userStorage := internal.NewUserStorage(minioClient, cfg.Storage.BucketName, cfg.Storage.BaseURL)
+	guildStorage := internal.NewGuildStorage(minioClient, cfg.Storage.BucketName, cfg.Storage.BaseURL)
 
-	if err := userStorage.EnsureBucket(context.Background()); err != nil {
+	if err := guildStorage.EnsureBucket(context.Background()); err != nil {
 		log.Fatal("Failed to ensure bucket exists", zap.Error(err))
 	}
-	
+
 	if err := sonyflake.InitSonyFlake(); err != nil {
 		log.Fatal("Failed to initialize Sonyflake",
 			zap.Error(err),
@@ -86,10 +76,13 @@ func main() {
 	}
 
 	r := gin.Default()
-	
+
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
-			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+			name := strings.SplitN(fld.Tag.Get("form"), ",", 2)[0]
+			if name == "" {
+				name = strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+			}
 			if name == "-" {
 				return ""
 			}
@@ -98,6 +91,7 @@ func main() {
 	}
 
 	r.Use(errors.ErrorHandler())
+	r.Use(internal.UserContext())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -105,18 +99,12 @@ func main() {
 		})
 	})
 
-	repo := internal.NewUserRepository(pool)
-	service := internal.NewUserService(repo, userStorage, log)
-	handler := internal.NewUserHandler(service)
-	
-	group := r.Group("/users")
-	group.GET("/:id/profile", handler.GetUserProfile)
-	
-	eventHandler := internal.NewEventHandler(service, nc, log)
-    if err := eventHandler.SubscribeToEvents(ctx); err != nil {
-        log.Fatal("Failed to subscribe to events", zap.Error(err))
-    }
+	repo := internal.NewGuildRepository(pool)
+	service := internal.NewGuildService(repo, guildStorage, log)
+	handler := internal.NewGuildHandler(service, log)
 
+	guildsGroup := r.Group("/guilds")
+	guildsGroup.POST("", handler.CreateGuild)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
@@ -125,7 +113,7 @@ func main() {
 
 	go func() {
 		log.Info(
-			fmt.Sprintf("Users service is running on port %s", cfg.Port),
+			fmt.Sprintf("Guilds service is running on port %s", cfg.Port),
 			zap.String("port", cfg.Port),
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -153,5 +141,4 @@ func main() {
 	}
 
 	log.Info("Server exited")
-
 }

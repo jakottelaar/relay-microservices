@@ -6,12 +6,12 @@ import (
 	"mime/multipart"
 	"path/filepath"
 
-	"github.com/jakottelaar/relay-microservices/services/users/config"
+	"github.com/jakottelaar/relay-microservices/services/guilds/config"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-type UserStorage struct {
+type GuildStorage struct {
     client     *minio.Client
     bucketName string
     baseURL    string
@@ -28,15 +28,15 @@ func NewStorageClient(cfg *config.Config) (*minio.Client, error) {
     return client, nil
 }
 
-func NewUserStorage(client *minio.Client, bucketName string, baseURL string) *UserStorage {
-    return &UserStorage{
+func NewGuildStorage(client *minio.Client, bucketName string, baseURL string) *GuildStorage {
+    return &GuildStorage{
         client:     client,
         bucketName: bucketName,
         baseURL:    baseURL,
     }
 }
 
-func (s *UserStorage) UploadUserAvatar(ctx context.Context, userID int64, file *multipart.FileHeader) (string, error) {
+func (s *GuildStorage) UploadGuildIcon(ctx context.Context, guildID int64, file *multipart.FileHeader) (string, error) {
     src, err := file.Open()
     if err != nil {
         return "", err
@@ -44,7 +44,7 @@ func (s *UserStorage) UploadUserAvatar(ctx context.Context, userID int64, file *
     defer src.Close()
 
     ext := filepath.Ext(file.Filename)
-    objectName := fmt.Sprintf("%d/avatar%s", userID, ext)
+    objectName := fmt.Sprintf("%d/icon%s", guildID, ext)
 
     _, err = s.client.PutObject(ctx, s.bucketName, objectName, src, file.Size, minio.PutObjectOptions{
         ContentType: file.Header.Get("Content-Type"),
@@ -56,12 +56,11 @@ func (s *UserStorage) UploadUserAvatar(ctx context.Context, userID int64, file *
     return fmt.Sprintf("%s/%s", s.bucketName, objectName), nil
 }
 
-func (s *UserStorage) EnsureBucket(ctx context.Context) error {
+func (s *GuildStorage) EnsureBucket(ctx context.Context) error {
     exists, err := s.client.BucketExists(ctx, s.bucketName)
     if err != nil {
         return err
     }
-
     if !exists {
         return s.client.MakeBucket(ctx, s.bucketName, minio.MakeBucketOptions{})
     }
