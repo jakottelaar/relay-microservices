@@ -1,7 +1,7 @@
 package internal
 
 type CreateGuildRequest struct {
-	Name        string `form:"name" binding:"required,min=3,max=100"`
+	Name        string `form:"name" binding:"required,min=1,max=100"`
 	Description string `form:"description" binding:"max=500"`
 }
 

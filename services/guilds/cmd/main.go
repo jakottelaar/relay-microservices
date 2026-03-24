@@ -79,7 +79,10 @@ func main() {
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
-			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+			name := strings.SplitN(fld.Tag.Get("form"), ",", 2)[0]
+			if name == "" {
+				name = strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+			}
 			if name == "-" {
 				return ""
 			}
