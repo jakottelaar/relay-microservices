@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
+	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"go.uber.org/zap"
 )
 
@@ -58,4 +59,33 @@ func (h *GuildHandler) CreateGuild(c *gin.Context) {
     )
 
     c.JSON(http.StatusCreated, guildResp)
+}
+
+func (h *GuildHandler) GetGuild(c *gin.Context) {
+    guildID, err := sonyflake.ParseID(c.Param("id"))
+    if err != nil {
+        c.Error(err)
+        return
+    }
+
+    h.log.Info("Get guild attempt",
+        zap.Int64("guild_id", guildID),
+    )
+
+    guildResp, err := h.service.GetGuild(c.Request.Context(), guildID)
+    if err != nil {
+        h.log.Error("Failed to get guild",
+            zap.Int64("guild_id", guildID),
+            zap.Error(err),
+        )
+        _ = c.Error(err)
+        return
+    }
+
+    h.log.Info("Guild retrieved successfully",
+        zap.String("guild_id", guildResp.ID),
+        zap.String("guild_name", guildResp.Name),
+    )
+
+    c.JSON(http.StatusOK, guildResp)
 }
