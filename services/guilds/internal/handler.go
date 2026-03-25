@@ -3,10 +3,10 @@ package internal
 import (
 	"mime/multipart"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
+	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"go.uber.org/zap"
 )
 
@@ -62,15 +62,9 @@ func (h *GuildHandler) CreateGuild(c *gin.Context) {
 }
 
 func (h *GuildHandler) GetGuild(c *gin.Context) {
-    guildIDStr := c.Param("id")
-
-    guildID, err := strconv.ParseInt(guildIDStr, 10, 64)
+    guildID, err := sonyflake.ParseID(c.Param("id"))
     if err != nil {
-        h.log.Warn("Invalid guild id",
-            zap.String("guild_id", guildIDStr),
-            zap.Error(err),
-        )
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+        c.Error(err)
         return
     }
 

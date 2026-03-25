@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jakottelaar/relay-microservices/services/guilds/internal/queries"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
@@ -77,6 +78,9 @@ func (s *guildService) CreateGuild(ctx context.Context, ownerID int64, req *Crea
 func (s *guildService) GetGuild(ctx context.Context, guildID int64) (*GuildResponse, error) {
     guild, err := s.repo.GetGuild(ctx, guildID)
     if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, errors.NewNotFoundError("Guild not found")
+        }
         s.log.Error("Failed to get guild from repository", zap.Error(err))
         return nil, errors.NewInternalServerError("Failed to get guild")
     }
