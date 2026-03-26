@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	CreateGuild(ctx context.Context, arg CreateGuildParams) (Guild, error)
+	GetGuild(ctx context.Context, id int64) (Guild, error)
 }
 
 var _ Querier = (*Queries)(nil)

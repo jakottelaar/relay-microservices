@@ -14,3 +14,15 @@ VALUES (
     $5
 )
 RETURNING *;
+
+-- name: GetGuild :one
+SELECT
+    id,
+    name,
+    description,
+    icon,
+    owner_id,
+    created_at,
+    updated_at
+FROM guilds
+WHERE id = $1;

@@ -12,4 +12,5 @@ type GuildResponse struct {
 	Icon        *string `json:"icon,omitempty"`
 	OwnerID     string  `json:"owner_id"` // change to user object later
 	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at,omitempty"`
 }
