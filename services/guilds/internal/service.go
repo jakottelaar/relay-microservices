@@ -113,6 +113,16 @@ func (s *guildService) GetGuild(ctx context.Context, guildID int64) (*GuildRespo
 }
 
 func (s *guildService) CreateGuildChannel(ctx context.Context, guildID int64, req *CreateGuildChannelRequest) (*GuildChannelResponse, error) {
+    var existingGuild, err = s.repo.GetGuild(ctx, guildID)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, errors.NewNotFoundError("Guild not found")
+        }
+        s.log.Error("Failed to get guild from repository", zap.Error(err))
+        return nil, errors.NewInternalServerError("Failed to get guild")
+    }
+
+
     channelID, err := sonyflake.GenerateSonyFlakeID()
     if err != nil {
         s.log.Error("Failed to generate channel ID", zap.Error(err))
@@ -131,7 +141,7 @@ func (s *guildService) CreateGuildChannel(ctx context.Context, guildID int64, re
 
     params := queries.CreateGuildChannelParams{
         ID:      channelID,
-        GuildID: guildID,
+        GuildID: existingGuild.ID,
         Name:    req.Name,
         Type:    int16(channelType),
         Topic:   pgtype.Text{String: reqTopic, Valid: reqTopic != ""},
@@ -153,7 +163,7 @@ func (s *guildService) CreateGuildChannel(ctx context.Context, guildID int64, re
         Name:      channel.Name,
         Type:      ChannelType(channel.Type),
         Topic:     topic,
-        GuildID:   strconv.FormatInt(channel.GuildID, 10),
+        GuildID:   strconv.FormatInt(existingGuild.ID, 10),
         CreatedAt: channel.CreatedAt.Time.Format(time.RFC3339),
         UpdatedAt: channel.UpdatedAt.Time.Format(time.RFC3339),
     }, nil
