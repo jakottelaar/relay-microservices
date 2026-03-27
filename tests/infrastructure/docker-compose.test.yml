@@ -61,7 +61,7 @@ services:
       dockerfile: services/users/Dockerfile
     env_file:
       - .env
-    container_name: relay-users
+    container_name: test-relay-users
     environment:
       - PORT=8081
       - DATABASE_URL=${USERS_DATABASE_URL}
@@ -78,7 +78,7 @@ services:
       dockerfile: services/guilds/Dockerfile
     env_file:
       - .env
-    container_name: relay-guilds
+    container_name: test-relay-guilds
     environment:
       - PORT=8082
       - DATABASE_URL=${GUILDS_DATABASE_URL}

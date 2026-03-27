@@ -50,6 +50,8 @@ func validationMessage(fe validator.FieldError) string {
         return fmt.Sprintf("Must be at least %s characters", fe.Param())
     case "max":
         return fmt.Sprintf("Must be at most %s characters", fe.Param())
+	case "oneof":
+		return "Invalid value"
     default:
         return fmt.Sprintf("Failed validation on '%s'", fe.Tag())
     }

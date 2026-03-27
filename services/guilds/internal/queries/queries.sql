@@ -26,3 +26,19 @@ SELECT
     updated_at
 FROM guilds
 WHERE id = $1;
+
+-- name: CreateGuildChannel :one
+INSERT INTO channels (
+    id,
+    guild_id,
+    name,
+    topic,
+    type
+)VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5
+)
+RETURNING *;

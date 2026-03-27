@@ -73,10 +73,10 @@ def test_post_guild_name_too_long(auth_client: Client):
     assert body["fields"]["name"] == "Must be at most 100 characters"
 
 def test_post_guild_description_too_long(auth_client: Client):
-    r = auth_client.post("/guilds", data={"name": "Test Guild", "description": "A" * 501})
+    r = auth_client.post("/guilds", data={"name": "Test Guild", "description": "A" * 301})
 
     assert r.status_code == 400, r.text
     body = r.json()
     assert body["error"] == "Validation failed"
-    assert body["fields"]["description"] == "Must be at most 500 characters"
+    assert body["fields"]["description"] == "Must be at most 300 characters"
 

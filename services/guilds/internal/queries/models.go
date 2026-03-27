@@ -8,6 +8,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Channel struct {
+	ID        int64              `json:"id"`
+	GuildID   int64              `json:"guild_id"`
+	Name      string             `json:"name"`
+	Topic     pgtype.Text        `json:"topic"`
+	Type      int16              `json:"type"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Guild struct {
 	ID          int64              `json:"id"`
 	Name        string             `json:"name"`
