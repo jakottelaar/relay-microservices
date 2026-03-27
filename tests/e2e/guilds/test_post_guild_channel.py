@@ -28,10 +28,6 @@ def setup_test_guild(auth_client: Client):
 def user_payload():
     return USER
 
-@pytest.fixture(scope="module")
-def guild_payload():
-    return GUILD
-
 def test_post_guild_channel(auth_client: Client, setup_test_guild):
     guild_id = setup_test_guild["id"]
     r = auth_client.post(f"/guilds/{guild_id}/channels", json={"name": "general", "type": 1, "topic": "General discussion"})
@@ -43,6 +39,17 @@ def test_post_guild_channel(auth_client: Client, setup_test_guild):
     assert body["guild_id"] == guild_id
     assert body["type"] == 1
     assert body["topic"] == "General discussion"
+
+def test_post_guild_channel_without_type(auth_client: Client, setup_test_guild):
+    guild_id = setup_test_guild["id"]
+    r = auth_client.post(f"/guilds/{guild_id}/channels", json={"name": "general"})
+
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["id"] is not None
+    assert body["name"] == "general"
+    assert body["guild_id"] == guild_id
+    assert body["type"] == 1  # Default to text channel
 
 def test_post_guild_channel_unauthorized(client: Client, setup_test_guild):
     guild_id = setup_test_guild["id"]
