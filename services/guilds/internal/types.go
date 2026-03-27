@@ -37,3 +37,14 @@ type GuildChannelResponse struct {
 	CreatedAt string      `json:"created_at"`
 	UpdatedAt string      `json:"updated_at,omitempty"`
 }
+
+type GuildMemberRequest struct {
+	Nick *string `json:"nick" binding:"omitempty,max=100"`
+}
+
+type GuildMemberResponse struct {
+	GuildID  string  `json:"guild_id"`
+	UserID   string  `json:"user_id"`
+	Nick     *string `json:"nick,omitempty"`
+	JoinedAt string  `json:"joined_at"`
+}

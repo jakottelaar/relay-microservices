@@ -19,6 +19,7 @@ type GuildService interface {
     CreateGuild(ctx context.Context, ownerID int64, req *CreateGuildRequest, icon *multipart.FileHeader) (*GuildResponse, error)
     GetGuild(ctx context.Context, guildID int64) (*GuildResponse, error)
     CreateGuildChannel(ctx context.Context, guildID int64, req *CreateGuildChannelRequest) (*GuildChannelResponse, error)
+    CreateGuildMember(ctx context.Context, guildID int64, userID int64, nick *string) (*GuildMemberResponse, error)
 }
 
 type guildService struct {
@@ -166,6 +167,47 @@ func (s *guildService) CreateGuildChannel(ctx context.Context, guildID int64, re
         GuildID:   strconv.FormatInt(existingGuild.ID, 10),
         CreatedAt: channel.CreatedAt.Time.Format(time.RFC3339),
         UpdatedAt: channel.UpdatedAt.Time.Format(time.RFC3339),
+    }, nil
+}
+
+func (s *guildService) CreateGuildMember(ctx context.Context, guildID int64, userID int64, nick *string) (*GuildMemberResponse, error) {
+    _, err := s.repo.GetGuild(ctx, guildID)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, errors.NewNotFoundError("Guild not found")
+        }
+        s.log.Error("Failed to get guild", zap.Error(err))
+        return nil, errors.NewInternalServerError("Failed to create guild member")
+    }
+
+    reqNick := ""
+    if nick != nil {
+        reqNick = *nick
+    }
+
+    member, err := s.repo.CreateGuildMember(ctx, queries.CreateGuildMemberParams{
+        GuildID: guildID,
+        UserID:  userID,
+        Nick:    pgtype.Text{String: reqNick, Valid: reqNick != ""},
+    })
+    if err != nil {
+        if errors.IsUniqueViolation(err) {
+            return nil, errors.NewDuplicateError("User is already a member of this guild")
+        }
+        s.log.Error("Failed to create guild member", zap.Error(err))
+        return nil, errors.NewInternalServerError("Failed to create guild member")
+    }
+
+    var memberNick *string
+    if member.Nick.Valid {
+        memberNick = &member.Nick.String
+    }
+
+    return &GuildMemberResponse{
+        GuildID:  strconv.FormatInt(guildID, 10),
+        UserID:   strconv.FormatInt(userID, 10),
+        Nick:     memberNick,
+        JoinedAt: member.JoinedAt.Time.Format(time.RFC3339),
     }, nil
 }
 

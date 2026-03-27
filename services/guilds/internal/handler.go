@@ -125,3 +125,45 @@ func (h *GuildHandler) CreateGuildChannel(c *gin.Context) {
 
     c.JSON(http.StatusCreated, channelResp)
 }
+
+func (h *GuildHandler) CreateGuildMember(c *gin.Context) {
+    guildID, err := sonyflake.ParseID(c.Param("id"))
+    if err != nil {
+        c.Error(err)
+        return
+    }
+
+    userID, err := sonyflake.ParseID(c.Param("user_id"))
+    if err != nil {
+        c.Error(err)
+        return
+    }
+
+    var req GuildMemberRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        h.log.Warn("Invalid request body", zap.Error(err),
+            zap.String("path", c.Request.URL.Path),
+        )
+        c.Error(errors.NewValidationError(err))
+        return
+    }
+
+    h.log.Info("Create guild member attempt",
+        zap.Int64("guild_id", guildID),
+        zap.Int64("user_id", userID),
+    )
+
+    memberResp, err := h.service.CreateGuildMember(c.Request.Context(), guildID, userID, req.Nick)
+    if err != nil {
+        h.log.Error("Failed to create guild member", zap.Error(err))
+        _ = c.Error(err)
+        return
+    }
+
+    h.log.Info("Guild member created successfully",
+        zap.Int64("guild_id", guildID),
+        zap.Int64("user_id", userID),
+    )
+
+    c.JSON(http.StatusCreated, memberResp)
+}

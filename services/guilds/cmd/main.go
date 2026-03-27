@@ -107,6 +107,7 @@ func main() {
 	guildsGroup.POST("", handler.CreateGuild)
 	guildsGroup.GET("/:id", handler.GetGuild)
 	guildsGroup.POST("/:id/channels", handler.CreateGuildChannel)
+	guildsGroup.POST("/:id/members/:user_id", handler.CreateGuildMember)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
