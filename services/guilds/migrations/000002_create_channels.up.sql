@@ -9,3 +9,8 @@ CREATE TABLE IF NOT EXISTS channels (
 );
 
 CREATE INDEX IF NOT EXISTS idx_channels_guild_id ON channels(guild_id);
+
+CREATE TRIGGER update_channels_updated_at
+    BEFORE UPDATE ON channels
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

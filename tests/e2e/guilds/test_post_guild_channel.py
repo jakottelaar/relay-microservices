@@ -1,7 +1,5 @@
 from httpx import Client
 import pytest
-from PIL import Image
-import io
 
 USER = {
     "email": "post-guild-tester@mail.com",

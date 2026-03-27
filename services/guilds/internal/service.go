@@ -113,7 +113,7 @@ func (s *guildService) GetGuild(ctx context.Context, guildID int64) (*GuildRespo
 }
 
 func (s *guildService) CreateGuildChannel(ctx context.Context, guildID int64, req *CreateGuildChannelRequest) (*GuildChannelResponse, error) {
-    var existingGuild, err = s.repo.GetGuild(ctx, guildID)
+    existingGuild, err := s.repo.GetGuild(ctx, guildID)
     if err != nil {
         if err == pgx.ErrNoRows {
             return nil, errors.NewNotFoundError("Guild not found")
