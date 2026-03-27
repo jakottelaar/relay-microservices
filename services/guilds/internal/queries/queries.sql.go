@@ -104,6 +104,36 @@ func (q *Queries) CreateGuildChannel(ctx context.Context, arg CreateGuildChannel
 	return i, err
 }
 
+const createGuildMember = `-- name: CreateGuildMember :one
+INSERT INTO guild_members (
+    guild_id,
+    user_id,
+    nick
+) VALUES (
+    $1,
+    $2,
+    $3
+) RETURNING guild_id, user_id, nick, joined_at
+`
+
+type CreateGuildMemberParams struct {
+	GuildID int64       `json:"guild_id"`
+	UserID  int64       `json:"user_id"`
+	Nick    pgtype.Text `json:"nick"`
+}
+
+func (q *Queries) CreateGuildMember(ctx context.Context, arg CreateGuildMemberParams) (GuildMember, error) {
+	row := q.db.QueryRow(ctx, createGuildMember, arg.GuildID, arg.UserID, arg.Nick)
+	var i GuildMember
+	err := row.Scan(
+		&i.GuildID,
+		&i.UserID,
+		&i.Nick,
+		&i.JoinedAt,
+	)
+	return i, err
+}
+
 const getGuild = `-- name: GetGuild :one
 SELECT
     id,

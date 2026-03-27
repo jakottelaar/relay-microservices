@@ -27,3 +27,10 @@ type Guild struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
+
+type GuildMember struct {
+	GuildID  int64              `json:"guild_id"`
+	UserID   int64              `json:"user_id"`
+	Nick     pgtype.Text        `json:"nick"`
+	JoinedAt pgtype.Timestamptz `json:"joined_at"`
+}

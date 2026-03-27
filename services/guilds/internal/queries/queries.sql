@@ -42,3 +42,14 @@ INSERT INTO channels (
     $5
 )
 RETURNING *;
+
+-- name: CreateGuildMember :one
+INSERT INTO guild_members (
+    guild_id,
+    user_id,
+    nick
+) VALUES (
+    $1,
+    $2,
+    $3
+) RETURNING *;

@@ -11,6 +11,7 @@ import (
 type Querier interface {
 	CreateGuild(ctx context.Context, arg CreateGuildParams) (Guild, error)
 	CreateGuildChannel(ctx context.Context, arg CreateGuildChannelParams) (Channel, error)
+	CreateGuildMember(ctx context.Context, arg CreateGuildMemberParams) (GuildMember, error)
 	GetGuild(ctx context.Context, id int64) (Guild, error)
 }
 
