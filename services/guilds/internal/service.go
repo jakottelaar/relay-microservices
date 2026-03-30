@@ -65,9 +65,28 @@ func (s *guildService) CreateGuild(ctx context.Context, ownerID int64, req *Crea
         Description: pgtype.Text{String: description, Valid: description != ""},
     }
 
-    guild, err := s.repo.CreateGuild(ctx, params)
+    var guild queries.Guild
+    err = s.repo.WithTx(ctx, func(q *queries.Queries) error {
+        createdGuild, err := q.CreateGuild(ctx, params)
+        if err != nil {
+            s.log.Error("Failed to create guild in repository", zap.Error(err))
+            return err
+        }
+        guild = createdGuild
+
+        _, err = q.CreateGuildMember(ctx, queries.CreateGuildMemberParams{
+            GuildID: guildID,
+            UserID:  guild.OwnerID,
+        })
+        if err != nil {
+            s.log.Error("Failed to create guild member for owner", zap.Error(err))
+            return err
+        }
+
+        return nil
+    })
+    
     if err != nil {
-        s.log.Error("Failed to create guild in repository", zap.Error(err))
         return nil, errors.NewInternalServerError("Failed to create guild")
     }
 
@@ -95,7 +114,6 @@ func (s *guildService) GetGuild(ctx context.Context, guildID int64) (*GuildRespo
         s.log.Error("Failed to get guild from repository", zap.Error(err))
         return nil, errors.NewInternalServerError("Failed to get guild")
     }
-
     
     var desc *string
     if guild.Description.Valid {
@@ -171,13 +189,17 @@ func (s *guildService) CreateGuildChannel(ctx context.Context, guildID int64, re
 }
 
 func (s *guildService) CreateGuildMember(ctx context.Context, guildID int64, userID int64, nick *string) (*GuildMemberResponse, error) {
-    _, err := s.repo.GetGuild(ctx, guildID)
+    guild, err := s.repo.GetGuild(ctx, guildID)
     if err != nil {
         if err == pgx.ErrNoRows {
             return nil, errors.NewNotFoundError("Guild not found")
         }
         s.log.Error("Failed to get guild", zap.Error(err))
         return nil, errors.NewInternalServerError("Failed to create guild member")
+    }
+
+    if guild.OwnerID == userID {
+        return nil, errors.NewBadRequestError("Guild owner cannot be added as a member")
     }
 
     reqNick := ""
