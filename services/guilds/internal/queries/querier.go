@@ -13,6 +13,7 @@ type Querier interface {
 	CreateGuildChannel(ctx context.Context, arg CreateGuildChannelParams) (Channel, error)
 	CreateGuildMember(ctx context.Context, arg CreateGuildMemberParams) (GuildMember, error)
 	GetGuild(ctx context.Context, id int64) (Guild, error)
+	GetGuildChannels(ctx context.Context, guildID int64) ([]Channel, error)
 }
 
 var _ Querier = (*Queries)(nil)
