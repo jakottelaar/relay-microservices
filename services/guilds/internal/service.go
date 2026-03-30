@@ -20,6 +20,7 @@ type GuildService interface {
     GetGuild(ctx context.Context, guildID int64) (*GuildResponse, error)
     CreateGuildChannel(ctx context.Context, guildID int64, req *CreateGuildChannelRequest) (*GuildChannelResponse, error)
     CreateGuildMember(ctx context.Context, guildID int64, userID int64, nick *string) (*GuildMemberResponse, error)
+    GetGuildChannels(ctx context.Context, guildID int64) ([]*GuildChannelResponse, error)
 }
 
 type guildService struct {
@@ -231,6 +232,37 @@ func (s *guildService) CreateGuildMember(ctx context.Context, guildID int64, use
         Nick:     memberNick,
         JoinedAt: member.JoinedAt.Time.Format(time.RFC3339),
     }, nil
+}
+
+func (s *guildService) GetGuildChannels(ctx context.Context, guildID int64) ([]*GuildChannelResponse, error) {
+    channels, err := s.repo.GetGuildChannels(ctx, guildID)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, errors.NewNotFoundError("Guild not found")
+        }
+        s.log.Error("Failed to get guild channels from repository", zap.Error(err))
+        return nil, errors.NewInternalServerError("Failed to get guild channels")
+    }
+
+    var channelResponses []*GuildChannelResponse
+    for _, channel := range channels {
+        var topic *string
+        if channel.Topic.Valid {
+            topic = &channel.Topic.String
+        }
+
+        channelResponses = append(channelResponses, &GuildChannelResponse{
+            ID:        strconv.FormatInt(channel.ID, 10),
+            Name:      channel.Name,
+            Type:      ChannelType(channel.Type),
+            Topic:     topic,
+            GuildID:   strconv.FormatInt(guildID, 10),
+            CreatedAt: channel.CreatedAt.Time.Format(time.RFC3339),
+            UpdatedAt: channel.UpdatedAt.Time.Format(time.RFC3339),
+        })
+    }
+
+    return channelResponses, nil
 }
 
 func (s *guildService) buildIconURL(icon pgtype.Text) *string {
