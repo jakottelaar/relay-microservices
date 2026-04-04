@@ -235,6 +235,15 @@ func (s *guildService) CreateGuildMember(ctx context.Context, guildID int64, use
 }
 
 func (s *guildService) GetGuildChannels(ctx context.Context, guildID int64) ([]*GuildChannelResponse, error) {
+    _, err := s.repo.GetGuild(ctx, guildID)
+    if err != nil {
+        if err == pgx.ErrNoRows {
+            return nil, errors.NewNotFoundError("Guild not found")
+        }
+        s.log.Error("Failed to get guild", zap.Error(err))
+        return nil, errors.NewInternalServerError("Failed to create guild member")
+    }
+
     channels, err := s.repo.GetGuildChannels(ctx, guildID)
     if err != nil {
         if err == pgx.ErrNoRows {
@@ -244,7 +253,7 @@ func (s *guildService) GetGuildChannels(ctx context.Context, guildID int64) ([]*
         return nil, errors.NewInternalServerError("Failed to get guild channels")
     }
 
-    var channelResponses []*GuildChannelResponse
+    channelResponses := make([]*GuildChannelResponse, 0, len(channels))
     for _, channel := range channels {
         var topic *string
         if channel.Topic.Valid {
