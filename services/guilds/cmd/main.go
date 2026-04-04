@@ -104,9 +104,16 @@ func main() {
 	handler := internal.NewGuildHandler(service, log)
 
 	guildsGroup := r.Group("/guilds")
+
+	// Guild routes
 	guildsGroup.POST("", handler.CreateGuild)
 	guildsGroup.GET("/:id", handler.GetGuild)
+	
+	// Guild channel routes
 	guildsGroup.POST("/:id/channels", handler.CreateGuildChannel)
+	guildsGroup.GET("/:id/channels", handler.GetGuildChannels)
+	
+	// Guild member routes
 	guildsGroup.POST("/:id/members/:user_id", handler.CreateGuildMember)
 
 	srv := &http.Server{

@@ -167,3 +167,29 @@ func (h *GuildHandler) CreateGuildMember(c *gin.Context) {
 
     c.JSON(http.StatusCreated, memberResp)
 }
+
+func (h *GuildHandler) GetGuildChannels(c *gin.Context) {
+    guildID, err := sonyflake.ParseID(c.Param("id"))
+    if err != nil {
+        c.Error(err)
+        return
+    }
+
+    h.log.Info("Get guild channels attempt",
+        zap.Int64("guild_id", guildID),
+    )
+
+    channelsResp, err := h.service.GetGuildChannels(c.Request.Context(), guildID)
+    if err != nil {
+        h.log.Error("Failed to get guild channels", zap.Error(err))
+        _ = c.Error(err)
+        return
+    }
+
+    h.log.Info("Guild channels retrieved successfully",
+        zap.Int64("guild_id", guildID),
+        zap.Int("channel_count", len(channelsResp)),
+    )
+
+    c.JSON(http.StatusOK, channelsResp)
+}

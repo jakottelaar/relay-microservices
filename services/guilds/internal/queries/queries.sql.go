@@ -161,3 +161,44 @@ func (q *Queries) GetGuild(ctx context.Context, id int64) (Guild, error) {
 	)
 	return i, err
 }
+
+const getGuildChannels = `-- name: GetGuildChannels :many
+SELECT
+    id,
+    guild_id,
+    name,
+    topic,
+    type,
+    created_at,
+    updated_at
+FROM channels
+WHERE guild_id = $1
+`
+
+func (q *Queries) GetGuildChannels(ctx context.Context, guildID int64) ([]Channel, error) {
+	rows, err := q.db.Query(ctx, getGuildChannels, guildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Channel{}
+	for rows.Next() {
+		var i Channel
+		if err := rows.Scan(
+			&i.ID,
+			&i.GuildID,
+			&i.Name,
+			&i.Topic,
+			&i.Type,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

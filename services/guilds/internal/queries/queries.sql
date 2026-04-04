@@ -53,3 +53,15 @@ INSERT INTO guild_members (
     $2,
     $3
 ) RETURNING *;
+
+-- name: GetGuildChannels :many
+SELECT
+    id,
+    guild_id,
+    name,
+    topic,
+    type,
+    created_at,
+    updated_at
+FROM channels
+WHERE guild_id = $1;
