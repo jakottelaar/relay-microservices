@@ -42,9 +42,12 @@ func RunMigrations(databaseURL string) error {
         "file://migrations",
         databaseURL,
     )
-    if err != nil {
+	
+	if err != nil {
         return err
     }
+	defer m.Close()
+
     if err := m.Up(); err != nil && err != migrate.ErrNoChange {
         return err
     }

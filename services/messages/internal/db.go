@@ -9,7 +9,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jakottelaar/relay-microservices/services/auth/config"
+	"github.com/jakottelaar/relay-microservices/services/messages/config"
 )
 
 func NewPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
@@ -43,7 +43,7 @@ func RunMigrations(databaseURL string) error {
         databaseURL,
     )
 	
-	if err != nil {
+    if err != nil {
         return err
     }
 	defer m.Close()
