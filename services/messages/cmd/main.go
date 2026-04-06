@@ -85,12 +85,20 @@ func main() {
 	}
 
 	r.Use(errors.ErrorHandler())
+	r.Use(internal.UserContext())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
 	})
+
+	repo := internal.NewMessageRepository(pool)
+	service := internal.NewMessageService(repo, log)
+	handler := internal.NewMessageHandler(service, log)
+
+	messagesGroup := r.Group("/channels/:channel_id/messages")
+	messagesGroup.POST("", handler.CreateMessage)
 	
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

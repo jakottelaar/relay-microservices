@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS messages (
-    id SERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     channel_id BIGINT NOT NULL,
     author_id BIGINT NOT NULL,
     content TEXT NOT NULL,

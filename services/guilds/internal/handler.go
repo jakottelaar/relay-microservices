@@ -23,7 +23,7 @@ func NewGuildHandler(service GuildService, log *zap.Logger) *GuildHandler {
 }
 
 func (h *GuildHandler) CreateGuild(c *gin.Context) {
-    userID := c.GetInt64("userID")
+    userID := c.GetInt64("user_id")
 
     var req CreateGuildRequest
     if err := c.ShouldBind(&req); err != nil {
