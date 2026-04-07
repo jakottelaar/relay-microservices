@@ -23,6 +23,14 @@ http:
       middlewares:
         - strip-api
         - forwardauth-middleware
+    messages-router:
+      rule: "PathPrefix(`/api/channels`)"
+      service: messages-service
+      entryPoints:
+        - web
+      middlewares:
+        - strip-api
+        - forwardauth-middleware
 
   middlewares:
     strip-api:
@@ -51,3 +59,7 @@ http:
       loadBalancer:
         servers:
           - url: "http://guilds:8082"
+    messages-service:
+      loadBalancer:
+        servers:
+          - url: "http://messages:8083"
