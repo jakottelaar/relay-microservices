@@ -31,7 +31,7 @@ func (h *MessageHandler) CreateMessage(c *gin.Context) {
     }
 
     var req CreateMessageRequest
-    if err := c.ShouldBind(&req); err != nil {
+    if err := c.ShouldBindJSON(&req); err != nil {
         h.log.Warn("Invalid request body", zap.Error(err),
             zap.String("path", c.Request.URL.Path),
         )

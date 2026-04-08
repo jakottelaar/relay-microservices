@@ -40,7 +40,7 @@ func (s *messageService) CreateMessage(ctx context.Context, userID int64, channe
 
 	message, err := s.repo.CreateMessage(ctx, queries.CreateMessageParams{
 		ID:        messageID,
-		Content:   req.Content,
+		Content:   *req.Content,
 		AuthorID:  userID,
 		ChannelID: channelID,
 	})
