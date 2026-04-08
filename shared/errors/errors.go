@@ -41,20 +41,28 @@ func NewValidationError(err error) *ServiceError {
 }
 
 func validationMessage(fe validator.FieldError) string {
-    switch fe.Tag() {
-    case "required":
-        return "This field is required"
-    case "email":
-        return "Must be a valid email address"
-    case "min":
-        return fmt.Sprintf("Must be at least %s characters", fe.Param())
-    case "max":
-        return fmt.Sprintf("Must be at most %s characters", fe.Param())
+	switch fe.Tag() {
+	case "required":
+		return "This field is required"
+	case "email":
+		return "Must be a valid email address"
+	case "min":
+		n := fe.Param()
+		if n == "1" {
+			return "Must be at least 1 character"
+		}
+		return fmt.Sprintf("Must be at least %s characters", n)
+	case "max":
+		n := fe.Param()
+		if n == "1" {
+			return "Must be at most 1 character"
+		}
+		return fmt.Sprintf("Must be at most %s characters", n)
 	case "oneof":
 		return "Invalid value"
-    default:
-        return fmt.Sprintf("Failed validation on '%s'", fe.Tag())
-    }
+	default:
+		return fmt.Sprintf("Failed validation on '%s'", fe.Tag())
+	}
 }
 
 func NewBadRequestError(msg string) error {

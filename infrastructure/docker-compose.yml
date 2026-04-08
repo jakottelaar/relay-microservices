@@ -89,6 +89,22 @@ services:
     networks:
       - relay-network
 
+  messages:
+    build:
+      context: ..
+      dockerfile: services/messages/Dockerfile
+    env_file:
+      - .env
+    container_name: relay-messages
+    environment:
+      - PORT=8083
+      - DATABASE_URL=${MESSAGES_DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - relay-network
+
   minio:
     image: minio/minio:latest
     container_name: relay-minio

@@ -23,10 +23,10 @@ func NewGuildHandler(service GuildService, log *zap.Logger) *GuildHandler {
 }
 
 func (h *GuildHandler) CreateGuild(c *gin.Context) {
-    userID := c.GetInt64("userID")
+    userID := c.GetInt64("user_id")
 
     var req CreateGuildRequest
-    if err := c.ShouldBind(&req); err != nil {
+    if err := c.ShouldBind(&req); err != nil { // Use ShouldBind to handle both JSON and form data
         h.log.Warn("Invalid request body", zap.Error(err),
             zap.String("path", c.Request.URL.Path),
         )
