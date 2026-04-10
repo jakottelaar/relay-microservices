@@ -58,3 +58,38 @@ func (h *MessageHandler) CreateMessage(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, messageResp)
 }
+
+func (h *MessageHandler) GetMessages(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+
+	channelID, err := sonyflake.ParseID(c.Param("channel_id"))
+	if err != nil {	
+		c.Error(err)
+		return
+	}
+
+	var q GetMessagesQuery
+    if err := c.ShouldBindQuery(&q); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+	h.log.Info("Get messages attempt",
+		zap.Int64("channel_id", channelID),
+		zap.Int64("user_id", userID),
+	)
+
+	messages, err := h.service.GetMessages(c.Request.Context(), userID, channelID, q.Before, q.After, q.Limit)
+	if err != nil {
+		h.log.Error("Failed to get messages", zap.Error(err))
+		_ = c.Error(err)
+		return
+	}
+
+	h.log.Info("Messages retrieved successfully",
+		zap.Int("message_count", len(messages)),
+		zap.Int64("channel_id", channelID),
+	)
+
+	c.JSON(http.StatusOK, messages)
+}
