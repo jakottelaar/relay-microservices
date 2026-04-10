@@ -99,6 +99,7 @@ func main() {
 
 	messagesGroup := r.Group("/channels/:channel_id/messages")
 	messagesGroup.POST("", handler.CreateMessage)
+	messagesGroup.GET("", handler.GetMessages)
 	
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

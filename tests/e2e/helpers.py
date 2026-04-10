@@ -33,6 +33,10 @@ def create_channel(client: httpx.Client, guild_id: str, name: str, type: int = 1
     assert r.status_code == 201, r.text
     return r.json()
 
+def create_message(client: httpx.Client, channel_id: str, content: str) -> dict:
+    r = client.post(f"/channels/{channel_id}/messages", json={"content": content})
+    assert r.status_code == 201, r.text
+    return r.json()
 
 def create_test_png() -> bytes:
     img = Image.new("RGB", (1, 1), color=(255, 0, 0))

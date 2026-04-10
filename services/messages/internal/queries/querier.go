@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
+	GetChannelMessages(ctx context.Context, arg GetChannelMessagesParams) ([]Message, error)
 }
 
 var _ Querier = (*Queries)(nil)

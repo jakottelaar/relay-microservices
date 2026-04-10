@@ -2,7 +2,7 @@ import pytest
 from httpx import Client
 from e2e.helpers import sign_up, sign_in, create_guild, create_channel
 
-USER = {"email": "messages-email@relay.dev", "username": "messages-user", "password": "Secret1234"}
+USER = {"email": "post-messages-email@relay.dev", "username": "post-messages-user", "password": "Secret1234"}
 
 @pytest.fixture(scope="module")
 def user(client: Client):

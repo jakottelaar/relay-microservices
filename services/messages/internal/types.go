@@ -12,3 +12,9 @@ type MessageResponse struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
+
+type GetMessagesQuery struct {
+	Before int64 `form:"before"`
+	After  int64 `form:"after"`
+	Limit  int32 `form:"limit"`
+}
