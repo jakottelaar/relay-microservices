@@ -7,7 +7,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - test_postgres_data:/var/lib/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
@@ -15,7 +15,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - relay-network
+      - test-relay-network
 
   traefik:
     image: traefik:latest
@@ -28,7 +28,7 @@ services:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
     networks:
-      - relay-network
+      - test-relay-network
 
   nats:
     image: nats:latest
@@ -37,7 +37,7 @@ services:
       - "4222:4222"
       - "8222:8222"
     networks:
-      - relay-network
+      - test-relay-network
 
   auth:
     build:
@@ -53,7 +53,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - relay-network
+      - test-relay-network
 
   users:
     build:
@@ -70,7 +70,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - relay-network
+      - test-relay-network
 
   guilds:
     build:
@@ -87,7 +87,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - relay-network
+      - test-relay-network
 
   messages:
     build:
@@ -103,7 +103,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - relay-network
+      - test-relay-network
 
   minio:
     image: minio/minio:latest
@@ -115,11 +115,11 @@ services:
       - .env
     command: server /data --console-address ":9001"
     networks:
-      - relay-network
+      - test-relay-network
 
 volumes:
-  postgres_data:
+  test_postgres_data:
 
 networks:
-  relay-network:
+  test-relay-network:
     driver: bridge
