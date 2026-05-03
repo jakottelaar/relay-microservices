@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jakottelaar/relay-microservices/services/gateway/config"
+	"github.com/jakottelaar/relay-microservices/services/gateway/internal"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
 	"go.uber.org/zap"
@@ -38,12 +39,20 @@ func main() {
 	r := gin.Default()
 
 	r.Use(errors.ErrorHandler())
+	r.Use(internal.UserContext())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
 	})
+
+	hub := internal.NewHub(log)
+	go hub.Run()
+
+	handler := internal.NewHandler(hub, log)
+
+	r.GET("/ws", handler.ServeWS)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
