@@ -24,6 +24,10 @@ Async:  NATS
 
 Each service owns its own PostgreSQL database. No shared databases.
 
+## System Diagram
+
+![Alt text](/docs/diagrams/relay-microservices-system-diagram.png)
+
 ## Tech Stack
 
 - Language: Go
