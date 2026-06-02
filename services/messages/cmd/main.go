@@ -94,7 +94,7 @@ func main() {
 	})
 
 	repo := internal.NewMessageRepository(pool)
-	service := internal.NewMessageService(repo, log)
+	service := internal.NewMessageService(repo, nc, log)
 	handler := internal.NewMessageHandler(service, log)
 
 	messagesGroup := r.Group("/channels/:channel_id/messages")

@@ -15,6 +15,7 @@ import (
 	"github.com/jakottelaar/relay-microservices/services/gateway/internal"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
+	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
@@ -36,6 +37,14 @@ func main() {
 		zap.String("port", cfg.Port),
 	)
 
+	nc, err := nats.Connect(cfg.NatsURL)
+	if err != nil {
+		log.Fatal("Failed to connect to NATS",
+			zap.Error(err),
+		)
+	}
+	defer nc.Close()
+
 	r := gin.Default()
 
 	r.Use(errors.ErrorHandler())
@@ -53,6 +62,12 @@ func main() {
 	handler := internal.NewHandler(hub, log)
 
 	r.GET("/ws", handler.ServeWS)
+
+	
+	eventHandler := internal.NewEventHandler(nc, hub, log)
+	if err := eventHandler.Subscribe(); err != nil {
+		log.Fatal("failed to subscribe to NATS", zap.Error(err))
+	}
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),

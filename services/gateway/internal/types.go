@@ -11,3 +11,5 @@ type Event struct {
 func marshalEvent(e *Event) ([]byte, error) {
 	return json.Marshal(e)
 }
+
+const EventMessageCreated = "MESSAGE_CREATE"

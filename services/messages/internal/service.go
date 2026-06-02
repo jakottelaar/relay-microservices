@@ -8,6 +8,7 @@ import (
 	"github.com/jakottelaar/relay-microservices/services/messages/internal/queries"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
+	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
@@ -18,12 +19,14 @@ type MessageService interface {
 
 type messageService struct {
 	repo *MessageRepository
+	nc  *nats.Conn
 	log  *zap.Logger
 }
 
-func NewMessageService(repo *MessageRepository, log *zap.Logger) *messageService {
+func NewMessageService(repo *MessageRepository, nc *nats.Conn, log *zap.Logger) *messageService {
 	return &messageService{
 		repo: repo,
+		nc: nc,
 		log:  log,
 	}
 }

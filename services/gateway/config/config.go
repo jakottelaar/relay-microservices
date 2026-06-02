@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Env  string
 	Port string
+	NatsURL string
 }
 
 func LoadConfig() (*Config, error) {
@@ -23,10 +24,12 @@ func LoadConfig() (*Config, error) {
 	}
 
 	port := getEnv("PORT", "8080")
+	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
 
 	return &Config{
 		Env:  env,
 		Port: port,
+		NatsURL: natsURL,
 	}, nil
 }
 
