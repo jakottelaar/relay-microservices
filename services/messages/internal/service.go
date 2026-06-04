@@ -2,11 +2,14 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/jakottelaar/relay-microservices/services/messages/internal/queries"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
+	"github.com/jakottelaar/relay-microservices/shared/events"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
@@ -65,6 +68,32 @@ func (s *messageService) CreateMessage(ctx context.Context, userID int64, channe
 	s.log.Info("Message created in service",
 		zap.String("message_id", messageResp.ID),
 		zap.Int64("channel_id", channelID),
+	)
+
+	event := &events.MessageCreatedEvent{
+		MessageID: messageResp.ID,
+		ChannelID: messageResp.ChannelID,
+		AuthorID:  messageResp.AuthorID,
+		Content:   messageResp.Content,
+		CreatedAt: messageResp.CreatedAt,
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		s.log.Error("Failed to marshal message created event", zap.Error(err))
+		return nil, err
+	}
+
+	subject := fmt.Sprintf("messages.channels.%s.created", event.ChannelID)
+	
+	if err := s.nc.Publish(subject, data); err != nil {
+		s.log.Error("Failed to publish message created event", zap.Error(err))
+		return nil, err
+	}
+
+	s.log.Info("Message created event published",
+		zap.String("subject", subject),
+		zap.String("message_id", messageResp.ID),
 	)
 
 	return messageResp, nil

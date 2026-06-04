@@ -76,7 +76,7 @@ func main() {
 
 	go func() {
 		log.Info(
-			fmt.Sprintf("Guilds service is running on port %s", cfg.Port),
+			fmt.Sprintf("Gateway service is running on port %s", cfg.Port),
 			zap.String("port", cfg.Port),
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
