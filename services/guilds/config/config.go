@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Env  string
 	Port string
+	GrpcPort string
 	DB   DBConfig
 	Storage StorageConfig
 }
@@ -42,6 +43,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	port := getEnv("PORT", "8080")
+	grpcPort := getEnv("GRPC_PORT", "50051")
 	databaseUrl := getEnv("DATABASE_URL", "")
 	if databaseUrl == "" {
 		return nil, fmt.Errorf("DATABASE_URL environment variable is required")
@@ -76,6 +78,7 @@ func LoadConfig() (*Config, error) {
 			BucketName:      bucketName,
 			BaseURL:         baseURL,
 		},
+		GrpcPort: grpcPort,
 	}, nil
 }
 

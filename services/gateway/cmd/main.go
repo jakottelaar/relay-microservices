@@ -7,24 +7,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"reflect"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
-	"github.com/go-playground/validator/v10"
-	"github.com/jakottelaar/relay-microservices/services/messages/config"
-	"github.com/jakottelaar/relay-microservices/services/messages/internal"
+	"github.com/jakottelaar/relay-microservices/services/gateway/config"
+	"github.com/jakottelaar/relay-microservices/services/gateway/internal"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
-	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
 
 func main() {
+
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -36,27 +32,10 @@ func main() {
 	}
 	defer log.Sync()
 
-	log.Info("Starting messages service",
+	log.Info("Starting guilds service",
 		zap.String("env", cfg.Env),
 		zap.String("port", cfg.Port),
 	)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	pool, err := internal.NewPool(ctx, cfg)
-	if err != nil {
-		log.Fatal("Failed to create database pool",
-			zap.Error(err),
-		)
-	}
-	defer pool.Close()
-
-	if err := internal.RunMigrations(cfg.DB.DatabaseUrl); err != nil {
-		log.Fatal("Failed to run database migrations",
-			zap.Error(err),
-		)
-	}
 
 	nc, err := nats.Connect(cfg.NatsURL)
 	if err != nil {
@@ -66,23 +45,7 @@ func main() {
 	}
 	defer nc.Close()
 
-	if err := sonyflake.InitSonyFlake(); err != nil {
-		log.Fatal("Failed to initialize Sonyflake",
-			zap.Error(err),
-		)
-	}
-
 	r := gin.Default()
-
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
-		if name == "-" {
-			return ""
-		}
-		return name
-	})
-	}
 
 	r.Use(errors.ErrorHandler())
 	r.Use(internal.UserContext())
@@ -93,14 +56,23 @@ func main() {
 		})
 	})
 
-	repo := internal.NewMessageRepository(pool)
-	service := internal.NewMessageService(repo, nc, log)
-	handler := internal.NewMessageHandler(service, log)
+	hub := internal.NewHub(log)
+	go hub.Run()
 
-	messagesGroup := r.Group("/channels/:channel_id/messages")
-	messagesGroup.POST("", handler.CreateMessage)
-	messagesGroup.GET("", handler.GetMessages)
-	
+	handler := internal.NewHandler(hub, log)
+
+	r.GET("/ws", handler.ServeWS)
+
+	guildsClient, err := internal.NewGuildsClient(cfg.GuildsGrpcAddr, log)
+	if err != nil {
+		log.Fatal("Failed to initialize guilds gRPC client", zap.Error(err))
+	}
+
+	eventHandler := internal.NewEventHandler(nc, hub, guildsClient, log)
+	if err := eventHandler.Subscribe(); err != nil {
+		log.Fatal("failed to subscribe to NATS", zap.Error(err))
+	}
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
 		Handler: r,
@@ -108,7 +80,7 @@ func main() {
 
 	go func() {
 		log.Info(
-			fmt.Sprintf("Messages service is running on port %s", cfg.Port),
+			fmt.Sprintf("Gateway service is running on port %s", cfg.Port),
 			zap.String("port", cfg.Port),
 		)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
