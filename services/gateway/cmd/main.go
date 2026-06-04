@@ -63,8 +63,12 @@ func main() {
 
 	r.GET("/ws", handler.ServeWS)
 
-	
-	eventHandler := internal.NewEventHandler(nc, hub, log)
+	guildsClient, err := internal.NewGuildsClient(cfg.GuildsGrpcAddr, log)
+	if err != nil {
+		log.Fatal("Failed to initialize guilds gRPC client", zap.Error(err))
+	}
+
+	eventHandler := internal.NewEventHandler(nc, hub, guildsClient, log)
 	if err := eventHandler.Subscribe(); err != nil {
 		log.Fatal("failed to subscribe to NATS", zap.Error(err))
 	}

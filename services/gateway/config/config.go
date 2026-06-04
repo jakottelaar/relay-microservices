@@ -11,6 +11,7 @@ type Config struct {
 	Env  string
 	Port string
 	NatsURL string
+	GuildsGrpcAddr string
 }
 
 func LoadConfig() (*Config, error) {
@@ -25,11 +26,13 @@ func LoadConfig() (*Config, error) {
 
 	port := getEnv("PORT", "8080")
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
+	guildsGrpcAddr := getEnv("GUILDS_GRPC_ADDR", "localhost:50051")
 
 	return &Config{
 		Env:  env,
 		Port: port,
 		NatsURL: natsURL,
+		GuildsGrpcAddr: guildsGrpcAddr,
 	}, nil
 }
 
