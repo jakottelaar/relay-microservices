@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package guilds;
+
+option go_package = "github.com/jakottelaar/relay-microservices/shared/proto/guilds";
+
+service GuildsService {
+  rpc GetChannelMembers(GetChannelMembersRequest) returns (GetChannelMembersResponse);
+}
+
+message GetChannelMembersRequest {
+  int64 channel_id = 1;
+}
+
+message GetChannelMembersResponse {
+  repeated int64 user_ids = 1;
+}

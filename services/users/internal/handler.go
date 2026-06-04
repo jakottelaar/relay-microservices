@@ -2,9 +2,9 @@ package internal
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 )
 
 type UserHandler struct {
@@ -16,14 +16,13 @@ func NewUserHandler(service UserService) *UserHandler {
 }
 
 func (h *UserHandler) GetUserProfile(c *gin.Context) {
-	userID := c.Param("id")
-	id, err := strconv.ParseInt(userID, 10, 64)
+	userID, err := sonyflake.ParseID(c.Param("id"))
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+        c.Error(err)
         return
     }
 
-	user, err := h.service.GetUserProfile(c.Request.Context(), id)
+	user, err := h.service.GetUserProfile(c.Request.Context(), userID)
 	if err != nil {
 		_ = c.Error(err)
 		return

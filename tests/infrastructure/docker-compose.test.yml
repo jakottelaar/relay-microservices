@@ -7,15 +7,15 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - test_postgres_data:/var/lib/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U relay"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - relay-network
+      - test-relay-network
 
   traefik:
     image: traefik:latest
@@ -28,7 +28,7 @@ services:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
     networks:
-      - relay-network
+      - test-relay-network
 
   nats:
     image: nats:latest
@@ -37,7 +37,7 @@ services:
       - "4222:4222"
       - "8222:8222"
     networks:
-      - relay-network
+      - test-relay-network
 
   auth:
     build:
@@ -53,7 +53,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - relay-network
+      - test-relay-network
 
   users:
     build:
@@ -61,7 +61,7 @@ services:
       dockerfile: services/users/Dockerfile
     env_file:
       - .env
-    container_name: relay-users
+    container_name: test-relay-users
     environment:
       - PORT=8081
       - DATABASE_URL=${USERS_DATABASE_URL}
@@ -70,7 +70,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - relay-network
+      - test-relay-network
 
   guilds:
     build:
@@ -78,7 +78,7 @@ services:
       dockerfile: services/guilds/Dockerfile
     env_file:
       - .env
-    container_name: relay-guilds
+    container_name: test-relay-guilds
     environment:
       - PORT=8082
       - DATABASE_URL=${GUILDS_DATABASE_URL}
@@ -87,7 +87,23 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - relay-network
+      - test-relay-network
+
+  messages:
+    build:
+      context: ../..
+      dockerfile: services/messages/Dockerfile
+    env_file:
+      - .env
+    container_name: test-relay-messages
+    environment:
+      - PORT=8083
+      - DATABASE_URL=${MESSAGES_DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - test-relay-network
 
   minio:
     image: minio/minio:latest
@@ -99,11 +115,11 @@ services:
       - .env
     command: server /data --console-address ":9001"
     networks:
-      - relay-network
+      - test-relay-network
 
 volumes:
-  postgres_data:
+  test_postgres_data:
 
 networks:
-  relay-network:
+  test-relay-network:
     driver: bridge

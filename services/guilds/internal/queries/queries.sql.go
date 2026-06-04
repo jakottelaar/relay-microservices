@@ -57,3 +57,175 @@ func (q *Queries) CreateGuild(ctx context.Context, arg CreateGuildParams) (Guild
 	)
 	return i, err
 }
+
+const createGuildChannel = `-- name: CreateGuildChannel :one
+INSERT INTO channels (
+    id,
+    guild_id,
+    name,
+    topic,
+    type
+)VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5
+)
+RETURNING id, guild_id, name, topic, type, created_at, updated_at
+`
+
+type CreateGuildChannelParams struct {
+	ID      int64       `json:"id"`
+	GuildID int64       `json:"guild_id"`
+	Name    string      `json:"name"`
+	Topic   pgtype.Text `json:"topic"`
+	Type    int16       `json:"type"`
+}
+
+func (q *Queries) CreateGuildChannel(ctx context.Context, arg CreateGuildChannelParams) (Channel, error) {
+	row := q.db.QueryRow(ctx, createGuildChannel,
+		arg.ID,
+		arg.GuildID,
+		arg.Name,
+		arg.Topic,
+		arg.Type,
+	)
+	var i Channel
+	err := row.Scan(
+		&i.ID,
+		&i.GuildID,
+		&i.Name,
+		&i.Topic,
+		&i.Type,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createGuildMember = `-- name: CreateGuildMember :one
+INSERT INTO guild_members (
+    guild_id,
+    user_id,
+    nick
+) VALUES (
+    $1,
+    $2,
+    $3
+) RETURNING guild_id, user_id, nick, joined_at
+`
+
+type CreateGuildMemberParams struct {
+	GuildID int64       `json:"guild_id"`
+	UserID  int64       `json:"user_id"`
+	Nick    pgtype.Text `json:"nick"`
+}
+
+func (q *Queries) CreateGuildMember(ctx context.Context, arg CreateGuildMemberParams) (GuildMember, error) {
+	row := q.db.QueryRow(ctx, createGuildMember, arg.GuildID, arg.UserID, arg.Nick)
+	var i GuildMember
+	err := row.Scan(
+		&i.GuildID,
+		&i.UserID,
+		&i.Nick,
+		&i.JoinedAt,
+	)
+	return i, err
+}
+
+const getGuild = `-- name: GetGuild :one
+SELECT
+    id,
+    name,
+    description,
+    icon,
+    owner_id,
+    created_at,
+    updated_at
+FROM guilds
+WHERE id = $1
+`
+
+func (q *Queries) GetGuild(ctx context.Context, id int64) (Guild, error) {
+	row := q.db.QueryRow(ctx, getGuild, id)
+	var i Guild
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.Icon,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getGuildChannels = `-- name: GetGuildChannels :many
+SELECT
+    id,
+    guild_id,
+    name,
+    topic,
+    type,
+    created_at,
+    updated_at
+FROM channels
+WHERE guild_id = $1
+`
+
+func (q *Queries) GetGuildChannels(ctx context.Context, guildID int64) ([]Channel, error) {
+	rows, err := q.db.Query(ctx, getGuildChannels, guildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Channel{}
+	for rows.Next() {
+		var i Channel
+		if err := rows.Scan(
+			&i.ID,
+			&i.GuildID,
+			&i.Name,
+			&i.Topic,
+			&i.Type,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMemberIDsByChannelID = `-- name: GetMemberIDsByChannelID :many
+SELECT gm.user_id
+FROM guild_members gm
+JOIN channels c ON c.guild_id = gm.guild_id
+WHERE c.id = $1
+`
+
+func (q *Queries) GetMemberIDsByChannelID(ctx context.Context, id int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, getMemberIDsByChannelID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var user_id int64
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
