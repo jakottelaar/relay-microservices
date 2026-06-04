@@ -202,3 +202,30 @@ func (q *Queries) GetGuildChannels(ctx context.Context, guildID int64) ([]Channe
 	}
 	return items, nil
 }
+
+const getMemberIDsByChannelID = `-- name: GetMemberIDsByChannelID :many
+SELECT gm.user_id
+FROM guild_members gm
+JOIN channels c ON c.guild_id = gm.guild_id
+WHERE c.id = $1
+`
+
+func (q *Queries) GetMemberIDsByChannelID(ctx context.Context, id int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, getMemberIDsByChannelID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var user_id int64
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

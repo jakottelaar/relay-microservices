@@ -65,3 +65,9 @@ SELECT
     updated_at
 FROM channels
 WHERE guild_id = $1;
+
+-- name: GetMemberIDsByChannelID :many
+SELECT gm.user_id
+FROM guild_members gm
+JOIN channels c ON c.guild_id = gm.guild_id
+WHERE c.id = $1;

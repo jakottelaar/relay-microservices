@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,8 +20,10 @@ import (
 	"github.com/jakottelaar/relay-microservices/services/guilds/internal"
 	"github.com/jakottelaar/relay-microservices/shared/errors"
 	"github.com/jakottelaar/relay-microservices/shared/logger"
+	pb "github.com/jakottelaar/relay-microservices/shared/proto/guilds"
 	"github.com/jakottelaar/relay-microservices/shared/sonyflake"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -116,6 +119,24 @@ func main() {
 	// Guild member routes
 	guildsGroup.POST("/:id/members/:user_id", handler.CreateGuildMember)
 
+	grpcServer := grpc.NewServer()
+   	pb.RegisterGuildsServiceServer(grpcServer, internal.NewGRPCServer(repo, log))
+
+	// start gRPC server on its own TCP listener
+	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GrpcPort))
+	if err != nil {
+		log.Fatal("Failed to start gRPC listener", zap.Error(err))
+	}
+
+	go func() {
+		log.Info(fmt.Sprintf("gRPC server is running on port %s", cfg.GrpcPort),
+			zap.String("grpc_port", cfg.GrpcPort),
+		)
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			log.Fatal("gRPC server failed", zap.Error(err))
+		}
+	}()
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Port),
 		Handler: r,
@@ -149,6 +170,8 @@ func main() {
 			zap.Error(err),
 		)
 	}
+
+	grpcServer.GracefulStop()
 
 	log.Info("Server exited")
 }
